@@ -103,7 +103,7 @@ window.uploadCover = async function () {
 
     const formData = new FormData();
     formData.append('file', selectedFile);
-    const uploadRes = await authFetch(`/api/projects/${encodeURIComponent(projectId)}/upload`, {
+    const uploadRes = await authFetch('/api/upload', {
       method: 'POST',
       body: formData,
     });
