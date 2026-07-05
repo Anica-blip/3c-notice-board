@@ -1,0 +1,110 @@
+<!-- ================================================
+     3C NOTICE BOARD — ADMIN: LANDING COVER TOOL
+     File: landing.html  (repo root)
+     ================================================ -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>3C Notice Board — Landing Cover</title>
+  <link rel="icon" type="image/png" href="assets/favicon.png" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body style="display:flex;flex-direction:column;min-height:100vh;">
+
+  <div class="watermark">
+    Designed and Built with ❤️ by Claude (Anthropic) × Chef Anica · 3C Thread To Success™ Cooking Lab 🧪👨‍🍳
+  </div>
+
+  <header id="toolbar">
+    <div>
+      <div class="neon-title" style="font-size:20px;">3C Notice Board</div>
+      <div style="font-size:13px;color:var(--text-2);margin-top:2px;">Landing Cover</div>
+    </div>
+    <a href="index.html" id="toolbar-back">← Back to Builder</a>
+  </header>
+
+  <div class="workspace">
+
+    <!-- LEFT — Select project + upload -->
+    <div class="col-panel">
+      <div class="col-title">1 — Select &amp; Upload</div>
+
+      <div class="field">
+        <label for="projectSelect">Select Project</label>
+        <select id="projectSelect">
+          <option value="">Loading projects…</option>
+        </select>
+        <span class="field-hint">
+          Only saved projects appear here. Save your project in the builder first, then come back to upload its landing cover.
+        </span>
+      </div>
+
+      <div class="field">
+        <label>Landing Cover Image</label>
+        <div
+          class="upload-area"
+          id="uploadArea"
+          ondragover="handleDragOver(event)"
+          ondragleave="handleDragLeave(event)"
+          ondrop="handleDrop(event)"
+        >
+          <input
+            type="file"
+            id="fileInput"
+            accept="image/*"
+            onchange="handleFileSelect(this)"
+          />
+          <div class="upload-icon">⬆</div>
+          <p>
+            Click to choose or drag &amp; drop<br/>
+            <strong>Image</strong> (PNG, JPG, WEBP)
+          </p>
+          <div class="chosen-file" id="chosenFileName"></div>
+        </div>
+        <span class="field-hint">
+          This is the first screen visitors see before entering that project's slider.
+          Portrait orientation recommended.
+        </span>
+      </div>
+    </div><!-- /left -->
+
+    <!-- RIGHT — Preview + Save to Cloudflare -->
+    <div class="col-panel">
+      <div class="col-title">2 — Preview &amp; Save to Cloudflare</div>
+
+      <div id="previewPlaceholder">
+        Preview appears here<br/>after selecting a file
+      </div>
+      <div id="previewWrap"></div>
+
+      <div id="progressWrap"><div id="progressBar"></div></div>
+      <div id="statusMsg"></div>
+
+      <div id="resultBlock">
+        <label>Saved — public URL:</label>
+        <div class="url-row">
+          <input type="text" id="resultUrl" readonly />
+          <button onclick="copyUrl()">Copy</button>
+        </div>
+        <div id="copiedMsg">Copied!</div>
+      </div>
+
+      <button id="btnUpload" class="btn-toolbar btn-save" disabled onclick="uploadCover()" style="width:100%;justify-content:center;">
+        Upload to Cloudflare
+      </button>
+
+    </div><!-- /right -->
+
+  </div><!-- /workspace -->
+
+  <footer class="admin-footer">
+    Designed and Built with ❤️ by <strong>Claude (Anthropic)</strong> × Chef Anica
+    · 3C Thread To Success™ Cooking Lab 🧪👨‍🍳
+  </footer>
+
+  <script type="module" src="js/landing.js"></script>
+
+</body>
+</html>
