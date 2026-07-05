@@ -1,40 +1,189 @@
+/* 3C Notice Board — Dark Purple Edition
+   Cloned palette/toolbar pattern from 3C Card Showcase Admin
+   Built by Claude (Anthropic) × Chef Anica · 3C Thread To Success */
+
+@import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700;800&family=Outfit:wght@300;400;500;600;700&display=swap');
+
 :root {
-  --purple-dark: #523474;
-  --blue-accent: #61d8e6;
-  --beige-accent: #a49079;
-  --cream-bg: #ddd5c9;
-  --indigo: #3c3678;
+  --bg:           #0a0714;
+  --surface:      #130f24;
+  --surface-2:    #0e0b1e;
+  --surface-3:    #1c1638;
+  --border:       #261a4e;
+  --border-light: #362762;
+  --accent:       #7c3aed;
+  --accent-light: #a855f7;
+  --accent-dim:   #5b21b6;
+  --accent-glow:  rgba(124,58,237,0.28);
+  --text:         #e2d9f3;
+  --text-2:       #9d8bbf;
+  --text-muted:   #594a7a;
+  --text-accent:  #c4b5f5;
+  --success:      #22c55e;
+  --danger:       #dc2626;
+  --warning:      #f59e0b;
 
   --neon-purple: #c77dff;
   --neon-purple-glow: rgba(199, 125, 255, 0.55);
-
-  --btn-bg: rgba(80, 104, 143, 0.28);
-  --btn-border: rgba(97, 216, 230, 0.22);
-  --btn-hover-bg: rgba(97, 216, 230, 0.22);
 }
 
-* { box-sizing: border-box; }
+*, *::before, *::after { box-sizing: border-box; }
 
 body {
-  font-family: 'Inter', Arial, sans-serif;
-  background: var(--purple-dark);
-  margin: 0;
+  font-family: 'Outfit', sans-serif;
+  background: var(--bg);
+  color: var(--text);
   min-height: 100vh;
-  color: #fff;
+  margin: 0;
+  -webkit-font-smoothing: antialiased;
 }
 
-/* ── Neon light-purple title, ~32px ── */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: var(--surface-2); }
+::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+
+/* ── WATERMARK — top-right, above the toolbar ── */
+.watermark {
+  text-align: right;
+  font-size: 10px;
+  color: var(--text-muted);
+  padding: 6px 20px 0;
+  background: var(--bg);
+}
+
+/* ── TOOLBAR — logo + title left, actions right ── */
+#toolbar {
+  position: sticky; top: 0; z-index: 100;
+  background: #12071f;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center;
+  justify-content: space-between;
+  padding: 12px 28px;
+  box-shadow: 0 2px 20px rgba(0,0,0,0.4);
+}
+#toolbar-left {
+  display: flex; align-items: center; gap: 12px;
+}
+#toolbar-left img {
+  width: 42px; height: 42px;
+  border-radius: 50%;
+  object-fit: cover;
+}
 .neon-title {
-  font-family: 'Arimo', Arial, sans-serif;
-  font-size: 32px;
-  font-weight: 700;
+  font-family: 'Open Sans', sans-serif;
+  font-size: 24px; font-weight: 800;
   color: var(--neon-purple);
   text-shadow: 0 0 6px var(--neon-purple-glow), 0 0 18px var(--neon-purple-glow);
-  text-align: center;
-  margin: 14px 0 6px 0;
+  margin: 0;
 }
+#toolbar-right { display: flex; align-items: center; gap: 10px; }
 
-/* ── Login card (shared by admin login) ── */
+/* ── ICON BUTTON ── */
+.icon-btn {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--border-light);
+  background: var(--surface);
+  color: var(--text-accent);
+  display: inline-flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.icon-btn:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+.icon-btn svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; }
+
+/* ── BUTTONS (toolbar hierarchy, cloned from Card Showcase) ── */
+.btn-toolbar {
+  background: var(--surface);
+  color: var(--text-accent);
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  padding: 9px 16px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 13px; font-weight: 700;
+  cursor: pointer; transition: all 0.15s;
+  text-decoration: none; white-space: nowrap;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.btn-toolbar:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+.btn-toolbar.btn-save { background: var(--accent); color: #fff; border-color: var(--accent); }
+.btn-toolbar.btn-save:hover { background: var(--accent-dim); box-shadow: 0 0 14px var(--accent-glow); }
+.btn-toolbar.btn-danger { background: transparent; color: #f87171; border-color: rgba(220,38,38,0.35); }
+.btn-toolbar.btn-danger:hover { background: var(--danger); color: #fff; }
+
+/* ── ADMIN LAYOUT ── */
+.admin-wrap { max-width: 720px; margin: 0 auto; padding: 24px 20px 80px; }
+
+.page-form {
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  margin: 24px 0;
+  display: grid;
+  gap: 14px;
+}
+.page-form label {
+  display: block;
+  font-size: 11px; font-weight: 700;
+  color: var(--text-2); text-transform: uppercase;
+  letter-spacing: 0.7px;
+  margin-bottom: 6px;
+}
+.page-form select,
+.page-form input[type="text"],
+.page-form input[type="file"] {
+  width: 100%;
+  background: var(--surface-2);
+  border: 1px solid var(--border-light);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 9px 12px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 13px;
+  outline: none;
+}
+.page-form select:focus,
+.page-form input:focus {
+  border-color: var(--accent-light);
+  box-shadow: 0 0 0 2px var(--accent-glow);
+}
+.page-form .row { display: flex; gap: 14px; flex-wrap: wrap; }
+.page-form .row > div { flex: 1; min-width: 160px; }
+.page-form .checkbox-row { display: flex; align-items: center; gap: 8px; }
+.page-form .checkbox-row label { margin: 0; text-transform: none; font-size: 13px; color: var(--text); font-weight: 500; }
+
+.status-msg { font-size: 12px; font-weight: 600; color: var(--text-accent); min-height: 1.2em; }
+
+/* ── ARCHIVE TABLE ── */
+#slider-archive {
+  margin-top: 30px;
+  background: var(--surface);
+  border: 1.5px solid var(--border-light);
+  border-radius: 12px;
+  padding: 20px;
+}
+#slider-archive h2 {
+  font-family: 'Open Sans', sans-serif;
+  font-size: 15px; font-weight: 700;
+  color: var(--text-accent); margin: 0 0 16px;
+}
+table { width: 100%; border-collapse: collapse; font-size: 12px; }
+thead tr { background: var(--surface-3); }
+thead th {
+  text-align: left; padding: 10px 12px;
+  font-size: 10px; font-weight: 700;
+  color: var(--text-2); text-transform: uppercase;
+  letter-spacing: 0.9px;
+  border-bottom: 1px solid var(--border);
+}
+tbody tr { border-bottom: 1px solid var(--border); transition: background 0.12s; }
+tbody tr:hover { background: rgba(124,58,237,0.05); }
+tbody td { padding: 10px 12px; color: var(--text); font-weight: 500; vertical-align: middle; }
+tbody td.actions-cell { display: flex; gap: 6px; }
+
+/* ── LOGIN CARD (login.html reuses this palette too) ── */
 .login-wrap {
   min-height: 100vh;
   display: flex;
@@ -46,10 +195,8 @@ body {
   max-width: 380px;
   width: 100%;
   text-align: center;
-  background: rgba(255,255,255,0.06);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  border: 1px solid rgba(199, 125, 255, 0.22);
+  background: var(--surface);
+  border: 1px solid var(--border-light);
   border-radius: 18px;
   padding: 32px 24px;
 }
@@ -59,142 +206,12 @@ body {
   margin-bottom: 10px;
 }
 .login-card .tagline {
-  color: rgba(255,255,255,0.65);
+  color: var(--text-2);
   font-size: 0.95rem;
   margin-bottom: 22px;
 }
-
-/* ── Buttons (symbols, not emojis) ── */
-.btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  justify-content: center;
-  font-family: 'Inter', Arial, sans-serif;
-  font-weight: 600;
-  font-size: 0.95rem;
-  color: #fff;
+.btn--github {
+  display: inline-flex; align-items: center; gap: 8px;
   text-decoration: none;
-  background: var(--btn-bg);
-  border: 1px solid var(--btn-border);
-  border-radius: 10px;
-  padding: 11px 22px;
-  cursor: pointer;
-  transition: background 0.18s, border-color 0.18s, transform 0.14s;
 }
-.btn:hover {
-  background: var(--btn-hover-bg);
-  border-color: rgba(97, 216, 230, 0.5);
-  transform: translateY(-2px);
-}
-.btn svg { width: 18px; height: 18px; fill: currentColor; stroke: currentColor; stroke-width: 1.6; fill: none; }
-
-/* ── Icon button (shared by admin + public) ── */
-.icon-btn {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  border: 1px solid rgba(97, 216, 230, 0.25);
-  background: rgba(255,255,255,0.06);
-  color: #fff;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
-}
-.icon-btn:hover {
-  background: rgba(97, 216, 230, 0.2);
-  border-color: rgba(97, 216, 230, 0.5);
-}
-.icon-btn svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; }
-
-.watermark {
-  position: fixed;
-  bottom: 8px;
-  left: 0;
-  right: 0;
-  text-align: center;
-  font-size: 0.72rem;
-  color: rgba(255,255,255,0.35);
-}
-.icon-btn {
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  border: 1px solid rgba(97, 216, 230, 0.25);
-  background: rgba(255,255,255,0.06);
-  color: #fff;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
-}
-.icon-btn:hover {
-  background: rgba(97, 216, 230, 0.2);
-  border-color: rgba(97, 216, 230, 0.5);
-}
-.icon-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; }
-
-.admin-wrap {
-  max-width: 720px;
-  margin: 0 auto;
-  padding: 24px 16px 80px;
-}
-.admin-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 18px;
-}
-
-.page-form {
-  background: rgba(255,255,255,0.06);
-  border: 1px solid rgba(199,125,255,0.2);
-  border-radius: 14px;
-  padding: 18px;
-  margin-bottom: 24px;
-  display: grid;
-  gap: 12px;
-}
-.page-form label {
-  font-size: 0.85rem;
-  color: rgba(255,255,255,0.7);
-  display: block;
-  margin-bottom: 4px;
-}
-.page-form select,
-.page-form input[type="text"],
-.page-form input[type="file"] {
-  width: 100%;
-  padding: 9px;
-  border-radius: 8px;
-  border: 1px solid rgba(97,216,230,0.25);
-  background: rgba(255,255,255,0.08);
-  color: #fff;
-}
-.page-form .row { display: flex; gap: 12px; flex-wrap: wrap; }
-.page-form .row > div { flex: 1; min-width: 140px; }
-.page-form .checkbox-row { display: flex; align-items: center; gap: 8px; }
-
-.page-list { display: grid; gap: 10px; }
-.page-card {
-  background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(97,216,230,0.15);
-  border-radius: 12px;
-  padding: 12px 14px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-.page-card .meta { font-size: 0.85rem; color: rgba(255,255,255,0.7); }
-.page-card .actions { display: flex; gap: 6px; }
-
-.status-msg {
-  font-size: 0.85rem;
-  color: var(--blue-accent);
-  margin-top: 6px;
-  min-height: 1.1em;
-}
+.btn--github svg { width: 18px; height: 18px; fill: currentColor; }
