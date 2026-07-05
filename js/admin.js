@@ -1,79 +1,43 @@
-// js/admin.js — 3C Notice Board admin panel logic (two-panel builder)
+// js/admin.js — 3C Notice Board admin panel logic
+// Title + pages are built up in local memory as you work. Add, edit
+// fields, reorder, and delete are all instant and local — nothing
+// touches the Worker until you click Save, which sends the whole
+// project (title + full pages array) in one call. This matches how
+// the Card Showcase builder actually works: one document, one save.
 
-import { requireLogin, authFetch, publicFetch, logout } from './auth.js';
+import { requireLogin, authFetch, logout, WORKER_BASE } from './auth.js';
 import { icon } from './icons.js';
 
 requireLogin();
 document.getElementById('logoutBtn').addEventListener('click', logout);
 
-function publicPageUrl(id) {
-  return `${window.location.origin}/3c-notice-board/public/#page=${id}`;
+function publicPageUrl(projectId, pageId) {
+  return `${window.location.origin}/3c-notice-board/public/?project=${projectId}#page=${pageId}`;
 }
 
-/* ══════════════════ LANDING COVER ══════════════════ */
-
-const landingFileInput = document.getElementById('landingFileInput');
-const landingUrlInput  = document.getElementById('landingUrlInput');
-const landingSaveBtn   = document.getElementById('landingSaveBtn');
-const landingStatus    = document.getElementById('landingStatus');
-const landingPreview   = document.getElementById('landingPreview');
-
-async function loadLanding() {
-  const res = await publicFetch('/api/landing');
-  const landing = await res.json();
-  if (landing && (landing.external_url || landing.r2_key)) {
-    const src = landing.external_url || landing.r2_key;
-    landingPreview.innerHTML = `<img src="${src}" alt="Landing cover" />`;
-    landingUrlInput.value = landing.external_url || '';
-  } else {
-    landingPreview.textContent = 'No cover set';
+function friendlyError(err) {
+  if (err.message === 'Failed to fetch' || err instanceof TypeError) {
+    return `Worker not reachable at ${WORKER_BASE} — is it deployed yet? Check js/auth.js WORKER_BASE if the address changed.`;
   }
+  return err.message;
 }
 
-landingSaveBtn.addEventListener('click', async () => {
-  landingStatus.textContent = '';
-  const file = landingFileInput.files[0];
-  const url  = landingUrlInput.value.trim();
+/* ══════════════════ STATE ══════════════════ */
+// currentProjectId is null until the first Save. Everything below is
+// local until then — this is the fix for "why do I have to save the
+// title before I can even add a card."
 
-  if (!file && !url) {
-    landingStatus.textContent = 'Upload an image or paste a URL first.';
-    return;
-  }
-
-  try {
-    let body = {};
-    if (file) {
-      landingStatus.textContent = 'Uploading…';
-      const formData = new FormData();
-      formData.append('file', file);
-      const uploadRes = await authFetch('/api/upload', { method: 'POST', body: formData });
-      const uploadData = await uploadRes.json();
-      if (!uploadRes.ok) throw new Error(uploadData.error || 'Upload failed');
-      body = { r2_key: uploadData.r2_key, external_url: null };
-    } else {
-      body = { external_url: url, r2_key: null };
-    }
-
-    landingStatus.textContent = 'Saving…';
-    const res = await authFetch('/api/landing', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) throw new Error((await res.json()).error || 'Save failed');
-
-    landingStatus.textContent = 'Landing cover saved.';
-    landingFileInput.value = '';
-    loadLanding();
-  } catch (err) {
-    landingStatus.textContent = err.message;
-  }
-});
-
-/* ══════════════════ SLIDER BUILDER (two panel) ══════════════════ */
-
-let pages = [];
+let currentProjectId = null;
+let pages = [];        // local working copy — page ids may be temporary until saved
 let selectedIndex = -1;
+let localIdCounter = 0; // for temporary client-side keys before a real page-XXX id exists
+
+/* ══════════════════ ELEMENTS ══════════════════ */
+
+const projectTitleInput = document.getElementById('projectTitleInput');
+const projectIdBadge    = document.getElementById('projectIdBadge');
+const projectStatus     = document.getElementById('projectStatus');
+const saveProjectBtn    = document.getElementById('saveProjectBtn');
 
 const cardPreviewLarge = document.getElementById('cardPreviewLarge');
 const navCounter  = document.getElementById('navCounter');
@@ -94,19 +58,147 @@ const fileInput      = document.getElementById('fileInput');
 const urlInput       = document.getElementById('urlInput');
 const shareableInput = document.getElementById('shareableInput');
 
-async function loadPages() {
-  const res = await publicFetch('/api/pages');
-  pages = await res.json();
+const archiveBody = document.getElementById('archiveBody');
 
-  if (pages.length === 0) {
-    selectedIndex = -1;
-  } else if (selectedIndex === -1 || selectedIndex >= pages.length) {
-    selectedIndex = 0;
+/* ══════════════════ SAVE (the only thing that hits the Worker for pages) ══════════════════ */
+
+saveProjectBtn.addEventListener('click', async () => {
+  const title = projectTitleInput.value.trim();
+  if (!title) {
+    projectStatus.textContent = 'Enter a title before saving.';
+    return;
   }
 
+  // Strip the temporary local-only fields before sending — the
+  // Worker assigns real page-XXX ids to anything without one.
+  const outgoingPages = pages.map(({ id, page_type, media_type, r2_key, external_url, shareable }) => ({
+    id: id.startsWith('local-') ? undefined : id,
+    page_type, media_type, r2_key, external_url, shareable,
+  }));
+
+  try {
+    if (!currentProjectId) {
+      projectStatus.textContent = 'Saving new project…';
+      const res = await authFetch('/api/projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, pages: outgoingPages }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error || 'Save failed');
+      const project = await res.json();
+
+      projectStatus.textContent = `Saved as ${project.id} — ${project.cloudflare_url}`;
+      await loadArchive();
+      resetWorkspace();
+    } else {
+      projectStatus.textContent = 'Saving changes…';
+      const res = await authFetch(`/api/projects/${encodeURIComponent(currentProjectId)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, pages: outgoingPages }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error || 'Save failed');
+      projectStatus.textContent = `${currentProjectId} updated.`;
+      await loadArchive();
+      resetWorkspace();
+    }
+  } catch (err) {
+    projectStatus.textContent = friendlyError(err);
+  }
+});
+
+function resetWorkspace() {
+  currentProjectId = null;
+  projectTitleInput.value = '';
+  projectIdBadge.textContent = 'Unsaved';
+  pages = [];
+  selectedIndex = -1;
   renderGrid();
   renderSelected();
 }
+
+/* ══════════════════ ARCHIVE (saved projects) ══════════════════ */
+
+async function loadArchive() {
+  try {
+    const res = await authFetch('/api/projects');
+    const projects = await res.json();
+    renderArchive(projects);
+  } catch (err) {
+    archiveBody.innerHTML = `<tr><td colspan="5" style="color:var(--danger);">${friendlyError(err)}</td></tr>`;
+  }
+}
+
+function renderArchive(projects) {
+  archiveBody.innerHTML = '';
+  if (!projects.length) {
+    archiveBody.innerHTML = '<tr><td colspan="5" style="color:var(--text-muted);">No saved projects yet.</td></tr>';
+    return;
+  }
+
+  projects.forEach(p => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${p.id}</td>
+      <td>${p.title}</td>
+      <td>${p.page_count ?? 0}</td>
+      <td class="url-cell">${p.cloudflare_url}</td>
+      <td class="actions-cell">
+        <button class="icon-btn" data-action="edit" data-id="${p.id}" title="Edit">${icon('edit')}</button>
+        <button class="icon-btn" data-action="open" data-id="${p.id}" data-url="${p.cloudflare_url}" title="View">${icon('link')}</button>
+        <button class="icon-btn" data-action="delete" data-id="${p.id}" title="Delete">${icon('delete')}</button>
+      </td>
+    `;
+    archiveBody.appendChild(tr);
+  });
+
+  archiveBody.querySelectorAll('[data-action="edit"]').forEach(btn => {
+    btn.addEventListener('click', () => loadProjectIntoWorkspace(btn.dataset.id));
+  });
+  archiveBody.querySelectorAll('[data-action="open"]').forEach(btn => {
+    btn.addEventListener('click', () => window.open(btn.dataset.url, '_blank', 'noopener'));
+  });
+  archiveBody.querySelectorAll('[data-action="delete"]').forEach(btn => {
+    btn.addEventListener('click', () => deleteProject(btn.dataset.id));
+  });
+}
+
+async function loadProjectIntoWorkspace(id) {
+  try {
+    projectStatus.textContent = 'Loading project…';
+    const projectsRes = await authFetch('/api/projects');
+    const projects = await projectsRes.json();
+    const project = projects.find(p => p.id === id);
+    if (!project) throw new Error('Project not found');
+
+    currentProjectId = id;
+    projectTitleInput.value = project.title;
+    projectIdBadge.textContent = id;
+    projectStatus.textContent = `Editing ${id} — change the title and/or pages, then Save.`;
+
+    const pagesRes = await authFetch(`/api/projects/${encodeURIComponent(id)}/pages`);
+    pages = await pagesRes.json();
+    selectedIndex = pages.length ? 0 : -1;
+    renderGrid();
+    renderSelected();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  } catch (err) {
+    projectStatus.textContent = friendlyError(err);
+  }
+}
+
+async function deleteProject(id) {
+  if (!confirm(`Delete project ${id}? This removes all its pages and media permanently.`)) return;
+  try {
+    await authFetch(`/api/projects/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    if (currentProjectId === id) resetWorkspace();
+    loadArchive();
+  } catch (err) {
+    projectStatus.textContent = friendlyError(err);
+  }
+}
+
+/* ══════════════════ TWO-PANEL BUILDER (all local until Save) ══════════════════ */
 
 function selectedPage() {
   return selectedIndex >= 0 ? pages[selectedIndex] : null;
@@ -116,7 +208,6 @@ function mediaSrc(page) {
   return page.external_url || page.r2_key || '';
 }
 
-/* ── Large preview + form population ── */
 function renderSelected() {
   const page = selectedPage();
 
@@ -152,15 +243,14 @@ function renderSelected() {
   urlInput.value       = page.external_url || '';
   shareableInput.checked = !!page.shareable;
   fileInput.value = '';
-  submitBtn.textContent = `Save ${page.id}`;
+  submitBtn.textContent = currentProjectId ? `Update ${page.id}` : 'Update Page';
 }
 
-/* ── Thumbnail grid ── */
 function renderGrid() {
   cardCount.textContent = `${pages.length} page${pages.length === 1 ? '' : 's'}`;
 
   if (pages.length === 0) {
-    cardGrid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px;font-size:13px;color:var(--text-muted);">No pages added yet. Click + Add to start.</div>';
+    cardGrid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px;font-size:13px;color:var(--text-muted);">No pages yet. Click + Add to start.</div>';
     return;
   }
 
@@ -181,10 +271,10 @@ function renderGrid() {
     cell.innerHTML = `
       <span class="card-number">${i + 1}</span>
       <div class="card-reorder">
-        <button class="reorder-btn" data-action="up" data-id="${page.id}" ${i === 0 ? 'disabled' : ''}>▲</button>
-        <button class="reorder-btn" data-action="down" data-id="${page.id}" ${i === pages.length - 1 ? 'disabled' : ''}>▼</button>
+        <button class="reorder-btn" data-action="up" data-idx="${i}" ${i === 0 ? 'disabled' : ''}>▲</button>
+        <button class="reorder-btn" data-action="down" data-idx="${i}" ${i === pages.length - 1 ? 'disabled' : ''}>▼</button>
       </div>
-      <button class="card-remove" data-action="remove" data-id="${page.id}">×</button>
+      <button class="card-remove" data-action="remove" data-idx="${i}">×</button>
       ${thumbHtml}
       <div class="grid-card-label">${page.page_type} · ${page.media_type}</div>
     `;
@@ -199,83 +289,71 @@ function renderGrid() {
     cardGrid.appendChild(cell);
   });
 
-  cardGrid.querySelectorAll('[data-action="up"]').forEach(btn => {
-    btn.addEventListener('click', () => moveCard(btn.dataset.id, -1));
-  });
-  cardGrid.querySelectorAll('[data-action="down"]').forEach(btn => {
-    btn.addEventListener('click', () => moveCard(btn.dataset.id, 1));
-  });
-  cardGrid.querySelectorAll('[data-action="remove"]').forEach(btn => {
-    btn.addEventListener('click', () => removeCard(btn.dataset.id));
-  });
+  cardGrid.querySelectorAll('[data-action="up"]').forEach(btn => btn.addEventListener('click', () => moveCard(+btn.dataset.idx, -1)));
+  cardGrid.querySelectorAll('[data-action="down"]').forEach(btn => btn.addEventListener('click', () => moveCard(+btn.dataset.idx, 1)));
+  cardGrid.querySelectorAll('[data-action="remove"]').forEach(btn => btn.addEventListener('click', () => removeCard(+btn.dataset.idx)));
 }
 
-/* ── Reorder (swap with neighbour, persist via /api/pages/reorder) ── */
-async function moveCard(id, direction) {
-  const idx = pages.findIndex(p => p.id === id);
+// Reorder, remove, and add are all local array operations now — no
+// network round-trip, no waiting, nothing persists until Save.
+function moveCard(idx, direction) {
   const swapWith = idx + direction;
   if (swapWith < 0 || swapWith >= pages.length) return;
-
-  const newOrder = [...pages];
-  [newOrder[idx], newOrder[swapWith]] = [newOrder[swapWith], newOrder[idx]];
-
   const selectedId = selectedPage()?.id;
-  await authFetch('/api/pages/reorder', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ order: newOrder.map(p => p.id) }),
-  });
-
-  await loadPages();
-  if (selectedId) {
-    const newIdx = pages.findIndex(p => p.id === selectedId);
-    if (newIdx !== -1) { selectedIndex = newIdx; renderGrid(); renderSelected(); }
-  }
+  [pages[idx], pages[swapWith]] = [pages[swapWith], pages[idx]];
+  if (selectedId) selectedIndex = pages.findIndex(p => p.id === selectedId);
+  renderGrid();
+  renderSelected();
 }
 
-async function removeCard(id) {
-  if (!confirm(`Delete ${id}? This cannot be undone.`)) return;
-  await authFetch(`/api/pages/${encodeURIComponent(id)}`, { method: 'DELETE' });
-  selectedIndex = -1;
-  loadPages();
+function removeCard(idx) {
+  if (!confirm('Remove this page from the project?')) return;
+  pages.splice(idx, 1);
+  selectedIndex = pages.length ? Math.min(idx, pages.length - 1) : -1;
+  renderGrid();
+  renderSelected();
 }
 
-/* ── Add ── */
-addPageBtn.addEventListener('click', async () => {
-  const res = await authFetch('/api/pages', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ page_type: 'portrait', media_type: 'image', shareable: true }),
-  });
-  const created = await res.json();
-  await loadPages();
-  selectedIndex = pages.findIndex(p => p.id === created.id);
+addPageBtn.addEventListener('click', () => {
+  const newPage = {
+    id: `local-${++localIdCounter}`,
+    page_type: 'portrait',
+    media_type: 'image',
+    r2_key: null,
+    external_url: null,
+    shareable: true,
+  };
+  pages.unshift(newPage);
+  selectedIndex = 0;
   renderGrid();
   renderSelected();
 });
 
-/* ── Nav arrows ── */
-navPrev.addEventListener('click', () => {
-  if (selectedIndex > 0) { selectedIndex--; renderGrid(); renderSelected(); }
-});
-navNext.addEventListener('click', () => {
-  if (selectedIndex < pages.length - 1) { selectedIndex++; renderGrid(); renderSelected(); }
-});
+navPrev.addEventListener('click', () => { if (selectedIndex > 0) { selectedIndex--; renderGrid(); renderSelected(); } });
+navNext.addEventListener('click', () => { if (selectedIndex < pages.length - 1) { selectedIndex++; renderGrid(); renderSelected(); } });
 
-/* ── Copy / Open ── */
 copyUrlBtn.addEventListener('click', async () => {
   const page = selectedPage();
-  if (!page) return;
-  await navigator.clipboard.writeText(publicPageUrl(page.id));
+  if (!page || !currentProjectId) {
+    formStatus.textContent = 'Save the project first — the public URL only exists once saved.';
+    return;
+  }
+  await navigator.clipboard.writeText(publicPageUrl(currentProjectId, page.id));
   formStatus.textContent = 'URL copied.';
 });
 openUrlBtn.addEventListener('click', () => {
   const page = selectedPage();
-  if (!page) return;
-  window.open(publicPageUrl(page.id), '_blank', 'noopener');
+  if (!page || !currentProjectId) {
+    formStatus.textContent = 'Save the project first — the public URL only exists once saved.';
+    return;
+  }
+  window.open(publicPageUrl(currentProjectId, page.id), '_blank', 'noopener');
 });
 
-/* ── Save (always updates the currently selected page) ── */
+// The form updates the SELECTED page's fields locally. File uploads
+// still hit the Worker immediately (there's no way to preview a file
+// without it existing somewhere), but that's the only network call
+// here — everything else waits for the toolbar Save.
 pageForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   const page = selectedPage();
@@ -285,13 +363,11 @@ pageForm.addEventListener('submit', async (e) => {
   const file        = fileInput.files[0];
   const externalUrl = urlInput.value.trim();
 
-  try {
-    const body = {
-      page_type: pageTypeInput.value,
-      media_type: mediaTypeInput.value,
-      shareable: shareableInput.checked,
-    };
+  page.page_type  = pageTypeInput.value;
+  page.media_type = mediaTypeInput.value;
+  page.shareable  = shareableInput.checked;
 
+  try {
     if (file) {
       formStatus.textContent = 'Uploading…';
       const formData = new FormData();
@@ -299,27 +375,24 @@ pageForm.addEventListener('submit', async (e) => {
       const uploadRes = await authFetch('/api/upload', { method: 'POST', body: formData });
       const uploadData = await uploadRes.json();
       if (!uploadRes.ok) throw new Error(uploadData.error || 'Upload failed');
-      body.r2_key = uploadData.r2_key;
-      body.external_url = null;
+      page.r2_key = uploadData.r2_key;
+      page.external_url = null;
     } else if (externalUrl && externalUrl !== (page.external_url || '')) {
-      body.external_url = externalUrl;
-      body.r2_key = null;
+      page.external_url = externalUrl;
+      page.r2_key = null;
     }
 
-    formStatus.textContent = 'Saving…';
-    const res = await authFetch(`/api/pages/${encodeURIComponent(page.id)}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) throw new Error((await res.json()).error || 'Save failed');
-
-    formStatus.textContent = `${page.id} saved.`;
-    loadPages();
+    pages[selectedIndex] = { ...page };
+    formStatus.textContent = 'Updated locally — click Save (top of page) to persist.';
+    renderGrid();
+    renderSelected();
   } catch (err) {
-    formStatus.textContent = err.message;
+    formStatus.textContent = friendlyError(err);
   }
 });
 
-loadLanding();
-loadPages();
+/* ══════════════════ INIT ══════════════════ */
+
+renderGrid();
+renderSelected();
+loadArchive();
