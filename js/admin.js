@@ -1,19 +1,18 @@
 // js/admin.js — 3C Notice Board admin panel logic
-// Title + pages are built up in local memory as you work. Add, edit
-// fields, reorder, and delete are all instant and local — nothing
-// touches the Worker until you click Save, which sends the whole
-// project (title + full pages array) in one call. This matches how
-// the Card Showcase builder actually works: one document, one save.
+// Pages are plain A4 files the admin uploads and manages — no shape
+// selection, no canvas fitting. Title and pages build up in local
+// memory (matching builder.js's addCard/removeCardAt/moveCard exactly:
+// instant, local, no network call). Files are also deferred now —
+// selecting one just gives a local blob preview (pendingFiles map,
+// same pattern as builder.js's pendingCardFiles); the actual upload to
+// R2 only happens for real when you click Save, one pass over
+// whichever pages still have a pending file.
 
 import { requireLogin, authFetch, logout, WORKER_BASE } from './auth.js';
 import { icon } from './icons.js';
 
 requireLogin();
 document.getElementById('logoutBtn').addEventListener('click', logout);
-
-function publicPageUrl(projectId, pageId) {
-  return `${window.location.origin}/3c-notice-board/public/?project=${projectId}#page=${pageId}`;
-}
 
 function friendlyError(err) {
   if (err.message === 'Failed to fetch' || err instanceof TypeError) {
@@ -23,19 +22,18 @@ function friendlyError(err) {
 }
 
 /* ══════════════════ STATE ══════════════════ */
-// currentProjectId is null until the first Save. Everything below is
-// local until then — this is the fix for "why do I have to save the
-// title before I can even add a card."
 
 let currentProjectId = null;
-let pages = [];        // local working copy — page ids may be temporary until saved
+let pages = [];
 let selectedIndex = -1;
-let localIdCounter = 0; // for temporary client-side keys before a real page-XXX id exists
+let localIdCounter = 0;
+let pendingFiles = {};
 
 /* ══════════════════ ELEMENTS ══════════════════ */
 
 const projectTitleInput = document.getElementById('projectTitleInput');
-const projectIdBadge    = document.getElementById('projectIdBadge');
+const titleLabel        = document.getElementById('titleLabel');
+const projectUrlDisplay = document.getElementById('projectUrlDisplay');
 const projectStatus     = document.getElementById('projectStatus');
 const saveProjectBtn    = document.getElementById('saveProjectBtn');
 
@@ -49,10 +47,7 @@ const addPageBtn  = document.getElementById('addPageBtn');
 const pageForm    = document.getElementById('pageForm');
 const formStatus  = document.getElementById('formStatus');
 const submitBtn   = document.getElementById('submitBtn');
-const copyUrlBtn  = document.getElementById('copyUrlBtn');
-const openUrlBtn  = document.getElementById('openUrlBtn');
 
-const pageTypeInput  = document.getElementById('pageType');
 const mediaTypeInput = document.getElementById('mediaType');
 const fileInput      = document.getElementById('fileInput');
 const urlInput       = document.getElementById('urlInput');
@@ -60,25 +55,68 @@ const shareableInput = document.getElementById('shareableInput');
 
 const archiveBody = document.getElementById('archiveBody');
 
-/* ══════════════════ SAVE (the only thing that hits the Worker for pages) ══════════════════ */
+/* ══════════════════ SAVE ══════════════════ */
+
+let nextIdPreview = null;
+
+async function loadNextIdPreview() {
+  try {
+    const res = await authFetch('/api/projects');
+    const projects = await res.json();
+    const max = projects.reduce((m, p) => Math.max(m, parseInt(p.id, 10) || 0), 0);
+    nextIdPreview = String(max + 1).padStart(2, '0');
+  } catch {
+    nextIdPreview = '—';
+  }
+  updateTitleLabel();
+}
+
+function updateTitleLabel() {
+  titleLabel.textContent = currentProjectId
+    ? `Editing #${currentProjectId}`
+    : `New Title #${nextIdPreview ?? '—'}`;
+}
+
+function hasUnsavedWork() {
+  return projectTitleInput.value.trim() !== '' || pages.length > 0;
+}
 
 saveProjectBtn.addEventListener('click', async () => {
   const title = projectTitleInput.value.trim();
   if (!title) {
-    projectStatus.textContent = 'Enter a title before saving.';
+    alert('Add a title to save this project');
     return;
   }
 
-  // Strip the temporary local-only fields before sending — the
-  // Worker assigns real page-XXX ids to anything without one.
-  const outgoingPages = pages.map(({ id, page_type, media_type, r2_key, external_url, shareable }) => ({
-    id: id.startsWith('local-') ? undefined : id,
-    page_type, media_type, r2_key, external_url, shareable,
-  }));
+  projectStatus.textContent = 'Saving to R2 bucket…';
 
   try {
+    const pageIdsWithPending = Object.keys(pendingFiles);
+    for (let i = 0; i < pageIdsWithPending.length; i++) {
+      const pageId = pageIdsWithPending[i];
+      const file = pendingFiles[pageId];
+      const page = pages.find(p => p.id === pageId);
+      if (!page || !file) continue;
+
+      projectStatus.textContent = `Saving to R2 bucket… (${i + 1} of ${pageIdsWithPending.length} files)`;
+      const formData = new FormData();
+      formData.append('file', file);
+      const uploadRes = await authFetch('/api/upload', { method: 'POST', body: formData });
+      const uploadData = await uploadRes.json();
+      if (!uploadRes.ok) throw new Error(uploadData.error || `Upload failed for ${pageId}`);
+      page.r2_key = uploadData.r2_key;
+      page.external_url = null;
+    }
+    pendingFiles = {};
+
+    projectStatus.textContent = 'Saving to R2 bucket…';
+
+    const outgoingPages = pages.map(({ id, media_type, r2_key, external_url, shareable }) => ({
+      id: id.startsWith('local-') ? undefined : id,
+      media_type, r2_key, external_url, shareable,
+    }));
+
     if (!currentProjectId) {
-      projectStatus.textContent = 'Saving new project…';
       const res = await authFetch('/api/projects', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -87,18 +125,22 @@ saveProjectBtn.addEventListener('click', async () => {
       if (!res.ok) throw new Error((await res.json()).error || 'Save failed');
       const project = await res.json();
 
-      projectStatus.textContent = `Saved as ${project.id} — ${project.cloudflare_url}`;
+      projectStatus.textContent = '';
+      alert(`Saved to R2 bucket\n\n${project.id} — ${project.cloudflare_url}`);
       await loadArchive();
+      await loadNextIdPreview();
       resetWorkspace();
     } else {
-      projectStatus.textContent = 'Saving changes…';
       const res = await authFetch(`/api/projects/${encodeURIComponent(currentProjectId)}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title, pages: outgoingPages }),
       });
       if (!res.ok) throw new Error((await res.json()).error || 'Save failed');
-      projectStatus.textContent = `${currentProjectId} updated.`;
+      const project = await res.json();
+
+      projectStatus.textContent = '';
+      alert(`Saved to R2 bucket\n\n${project.id} — ${project.cloudflare_url}`);
       await loadArchive();
       resetWorkspace();
     }
@@ -110,14 +152,23 @@ saveProjectBtn.addEventListener('click', async () => {
 function resetWorkspace() {
   currentProjectId = null;
   projectTitleInput.value = '';
-  projectIdBadge.textContent = 'Unsaved';
+  projectUrlDisplay.value = '';
+  updateTitleLabel();
   pages = [];
+  pendingFiles = {};
   selectedIndex = -1;
   renderGrid();
   renderSelected();
 }
 
-/* ══════════════════ ARCHIVE (saved projects) ══════════════════ */
+window.addEventListener('beforeunload', (e) => {
+  if (hasUnsavedWork()) {
+    e.preventDefault();
+    e.returnValue = '';
+  }
+});
+
+/* ══════════════════ ARCHIVE ══════════════════ */
 
 async function loadArchive() {
   try {
@@ -173,11 +224,13 @@ async function loadProjectIntoWorkspace(id) {
 
     currentProjectId = id;
     projectTitleInput.value = project.title;
-    projectIdBadge.textContent = id;
+    projectUrlDisplay.value = project.cloudflare_url;
+    updateTitleLabel();
     projectStatus.textContent = `Editing ${id} — change the title and/or pages, then Save.`;
 
     const pagesRes = await authFetch(`/api/projects/${encodeURIComponent(id)}/pages`);
     pages = await pagesRes.json();
+    pendingFiles = {};
     selectedIndex = pages.length ? 0 : -1;
     renderGrid();
     renderSelected();
@@ -198,23 +251,24 @@ async function deleteProject(id) {
   }
 }
 
-/* ══════════════════ TWO-PANEL BUILDER (all local until Save) ══════════════════ */
+/* ══════════════════ BUILDER (matches builder.js: local, instant) ══════════════════ */
 
 function selectedPage() {
   return selectedIndex >= 0 ? pages[selectedIndex] : null;
 }
 
 function mediaSrc(page) {
-  return page.external_url || page.r2_key || '';
+  return page.localPreview || page.external_url || page.r2_key || '';
 }
 
 function renderSelected() {
   const page = selectedPage();
 
   if (!page) {
-    cardPreviewLarge.className = 'card-preview-large shape-portrait';
     cardPreviewLarge.innerHTML = '<div class="card-preview-empty">No pages yet<br/>Click + Add</div>';
     navCounter.textContent = '0 of 0';
+    fileInput.value = '';
+    urlInput.value = '';
     pageForm.style.opacity = '0.4';
     pageForm.style.pointerEvents = 'none';
     return;
@@ -224,26 +278,30 @@ function renderSelected() {
   pageForm.style.pointerEvents = 'auto';
 
   const src = mediaSrc(page);
-  cardPreviewLarge.className = `card-preview-large shape-${page.page_type}`;
 
-  let mediaHtml = `<div class="media-type-badge">${page.media_type}</div>`;
   if (page.media_type === 'image') {
-    mediaHtml += src ? `<img src="${src}" alt="${page.id}" />` : '<div class="card-preview-empty">No image set</div>';
+    cardPreviewLarge.innerHTML = src
+      ? `<img src="${src}" alt="Page ${selectedIndex + 1}" />`
+      : '<div class="card-preview-empty">No image<br/>Upload below</div>';
   } else if (page.media_type === 'video') {
-    mediaHtml += src ? `<video src="${src}" muted></video>` : '<div class="card-preview-empty">No video set</div>';
+    cardPreviewLarge.innerHTML = src
+      ? `<video src="${src}" muted playsinline preload="metadata"></video>`
+      : '<div class="card-preview-empty">No video<br/>Upload below</div>';
   } else {
-    mediaHtml += '<div class="card-preview-empty">Audio page<br/>' + (src ? src : 'No audio set') + '</div>';
+    cardPreviewLarge.innerHTML = src
+      ? `<div class="card-preview-empty">Audio page<br/>${src.split('/').pop()}</div>`
+      : '<div class="card-preview-empty">No audio<br/>Upload below</div>';
   }
-  cardPreviewLarge.innerHTML = mediaHtml;
 
   navCounter.textContent = `${selectedIndex + 1} of ${pages.length}`;
+  navPrev.disabled = selectedIndex <= 0;
+  navNext.disabled = selectedIndex >= pages.length - 1;
 
-  pageTypeInput.value  = page.page_type;
   mediaTypeInput.value = page.media_type;
   urlInput.value       = page.external_url || '';
   shareableInput.checked = !!page.shareable;
   fileInput.value = '';
-  submitBtn.textContent = currentProjectId ? `Update ${page.id}` : 'Update Page';
+  submitBtn.textContent = 'Update Page';
 }
 
 function renderGrid() {
@@ -259,13 +317,19 @@ function renderGrid() {
     const src = mediaSrc(page);
     const cell = document.createElement('div');
     cell.className = `grid-card${i === selectedIndex ? ' selected' : ''}`;
+    cell.title = `Page ${i + 1} — click to select`;
 
     let thumbHtml;
-    if (page.media_type === 'image' && src) {
-      thumbHtml = `<img class="grid-card-thumb shape-${page.page_type}" src="${src}" alt="${page.id}" />`;
+    if (page.media_type === 'image') {
+      thumbHtml = src
+        ? `<img class="grid-card-thumb" src="${src}" alt="Page ${i + 1}" />`
+        : `<div class="grid-card-icon">${icon('edit')}</div>`;
+    } else if (page.media_type === 'video') {
+      thumbHtml = src
+        ? `<video class="grid-card-thumb" src="${src}" muted playsinline preload="metadata"></video>`
+        : `<div class="grid-card-icon">${icon('play')}</div>`;
     } else {
-      const glyph = page.media_type === 'video' ? icon('play') : page.media_type === 'audio' ? icon('link') : icon('edit');
-      thumbHtml = `<div class="grid-card-icon">${glyph}</div>`;
+      thumbHtml = `<div class="grid-card-icon">${icon('link')}</div>`;
     }
 
     cell.innerHTML = `
@@ -276,7 +340,7 @@ function renderGrid() {
       </div>
       <button class="card-remove" data-action="remove" data-idx="${i}">×</button>
       ${thumbHtml}
-      <div class="grid-card-label">${page.page_type} · ${page.media_type}</div>
+      <div class="grid-card-label">${page.media_type}</div>
     `;
 
     cell.addEventListener('click', (e) => {
@@ -289,13 +353,11 @@ function renderGrid() {
     cardGrid.appendChild(cell);
   });
 
-  cardGrid.querySelectorAll('[data-action="up"]').forEach(btn => btn.addEventListener('click', () => moveCard(+btn.dataset.idx, -1)));
-  cardGrid.querySelectorAll('[data-action="down"]').forEach(btn => btn.addEventListener('click', () => moveCard(+btn.dataset.idx, 1)));
-  cardGrid.querySelectorAll('[data-action="remove"]').forEach(btn => btn.addEventListener('click', () => removeCard(+btn.dataset.idx)));
+  cardGrid.querySelectorAll('[data-action="up"]').forEach(btn => btn.addEventListener('click', (e) => { e.stopPropagation(); moveCard(+btn.dataset.idx, -1); }));
+  cardGrid.querySelectorAll('[data-action="down"]').forEach(btn => btn.addEventListener('click', (e) => { e.stopPropagation(); moveCard(+btn.dataset.idx, 1); }));
+  cardGrid.querySelectorAll('[data-action="remove"]').forEach(btn => btn.addEventListener('click', (e) => { e.stopPropagation(); removeCard(+btn.dataset.idx); }));
 }
 
-// Reorder, remove, and add are all local array operations now — no
-// network round-trip, no waiting, nothing persists until Save.
 function moveCard(idx, direction) {
   const swapWith = idx + direction;
   if (swapWith < 0 || swapWith >= pages.length) return;
@@ -308,7 +370,8 @@ function moveCard(idx, direction) {
 
 function removeCard(idx) {
   if (!confirm('Remove this page from the project?')) return;
-  pages.splice(idx, 1);
+  const [removed] = pages.splice(idx, 1);
+  if (removed) delete pendingFiles[removed.id];
   selectedIndex = pages.length ? Math.min(idx, pages.length - 1) : -1;
   renderGrid();
   renderSelected();
@@ -317,11 +380,11 @@ function removeCard(idx) {
 addPageBtn.addEventListener('click', () => {
   const newPage = {
     id: `local-${++localIdCounter}`,
-    page_type: 'portrait',
     media_type: 'image',
     r2_key: null,
     external_url: null,
     shareable: true,
+    localPreview: '',
   };
   pages.unshift(newPage);
   selectedIndex = 0;
@@ -332,63 +395,47 @@ addPageBtn.addEventListener('click', () => {
 navPrev.addEventListener('click', () => { if (selectedIndex > 0) { selectedIndex--; renderGrid(); renderSelected(); } });
 navNext.addEventListener('click', () => { if (selectedIndex < pages.length - 1) { selectedIndex++; renderGrid(); renderSelected(); } });
 
-copyUrlBtn.addEventListener('click', async () => {
+fileInput.addEventListener('change', () => {
   const page = selectedPage();
-  if (!page || !currentProjectId) {
-    formStatus.textContent = 'Save the project first — the public URL only exists once saved.';
-    return;
-  }
-  await navigator.clipboard.writeText(publicPageUrl(currentProjectId, page.id));
-  formStatus.textContent = 'URL copied.';
-});
-openUrlBtn.addEventListener('click', () => {
-  const page = selectedPage();
-  if (!page || !currentProjectId) {
-    formStatus.textContent = 'Save the project first — the public URL only exists once saved.';
-    return;
-  }
-  window.open(publicPageUrl(currentProjectId, page.id), '_blank', 'noopener');
+  const file = fileInput.files[0];
+  if (!page || !file) return;
+
+  pendingFiles[page.id] = file;
+  page.localPreview = URL.createObjectURL(file);
+  page.r2_key = null;
+  page.external_url = null;
+  urlInput.value = '';
+
+  renderGrid();
+  renderSelected();
 });
 
-// The form updates the SELECTED page's fields locally. File uploads
-// still hit the Worker immediately (there's no way to preview a file
-// without it existing somewhere), but that's the only network call
-// here — everything else waits for the toolbar Save.
-pageForm.addEventListener('submit', async (e) => {
+urlInput.addEventListener('input', () => {
+  const page = selectedPage();
+  if (!page) return;
+  const url = urlInput.value.trim();
+
+  page.external_url = url || null;
+  if (url) {
+    page.r2_key = null;
+    page.localPreview = '';
+    delete pendingFiles[page.id];
+    fileInput.value = '';
+  }
+  renderGrid();
+});
+
+pageForm.addEventListener('submit', (e) => {
   e.preventDefault();
   const page = selectedPage();
   if (!page) return;
-  formStatus.textContent = '';
 
-  const file        = fileInput.files[0];
-  const externalUrl = urlInput.value.trim();
-
-  page.page_type  = pageTypeInput.value;
   page.media_type = mediaTypeInput.value;
   page.shareable  = shareableInput.checked;
 
-  try {
-    if (file) {
-      formStatus.textContent = 'Uploading…';
-      const formData = new FormData();
-      formData.append('file', file);
-      const uploadRes = await authFetch('/api/upload', { method: 'POST', body: formData });
-      const uploadData = await uploadRes.json();
-      if (!uploadRes.ok) throw new Error(uploadData.error || 'Upload failed');
-      page.r2_key = uploadData.r2_key;
-      page.external_url = null;
-    } else if (externalUrl && externalUrl !== (page.external_url || '')) {
-      page.external_url = externalUrl;
-      page.r2_key = null;
-    }
-
-    pages[selectedIndex] = { ...page };
-    formStatus.textContent = 'Updated locally — click Save (top of page) to persist.';
-    renderGrid();
-    renderSelected();
-  } catch (err) {
-    formStatus.textContent = friendlyError(err);
-  }
+  formStatus.textContent = 'Updated locally — click Save (top of page) to persist.';
+  renderGrid();
+  renderSelected();
 });
 
 /* ══════════════════ INIT ══════════════════ */
@@ -396,3 +443,4 @@ pageForm.addEventListener('submit', async (e) => {
 renderGrid();
 renderSelected();
 loadArchive();
+loadNextIdPreview();
