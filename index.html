@@ -31,67 +31,110 @@
 
   <div class="admin-wrap">
 
-    <form class="page-form" id="pageForm">
-      <div class="row">
+    <!-- ── LANDING COVER — separate from the slider ── -->
+    <div class="landing-section">
+      <h2>Landing Cover</h2>
+      <div class="field-hint">
+        The single image shown before entering the board — not one of the numbered slider pages below.
+      </div>
+      <div class="landing-workspace">
         <div>
-          <label for="pageType">Page shape</label>
-          <select id="pageType" required>
-            <option value="portrait">Portrait (9:16)</option>
-            <option value="landscape">Landscape (16:9)</option>
-            <option value="square">Square (1:1)</option>
-          </select>
+          <label class="landing-upload-area" for="landingFileInput">
+            <input type="file" id="landingFileInput" accept="image/*" />
+            <p>Click or drag an image here<br><strong>or</strong> paste an R2 URL below</p>
+          </label>
+          <div style="margin-top:10px;">
+            <input type="text" id="landingUrlInput" placeholder="https://files.3c-public-library.org/..." />
+          </div>
+          <button class="btn-toolbar btn-save" id="landingSaveBtn" style="margin-top:10px;">Save Landing Cover</button>
+          <div class="status-msg" id="landingStatus"></div>
         </div>
-        <div>
-          <label for="mediaType">Media type</label>
-          <select id="mediaType" required>
-            <option value="image">Image</option>
-            <option value="video">Video</option>
-            <option value="audio">Audio</option>
-          </select>
-        </div>
+        <div class="landing-preview" id="landingPreview">No cover set</div>
       </div>
-
-      <div>
-        <label for="fileInput">Upload new file</label>
-        <input type="file" id="fileInput" />
-      </div>
-
-      <div>
-        <label for="urlInput">— OR — link an existing Cloudflare/R2 URL</label>
-        <input type="text" id="urlInput" placeholder="https://files.3c-public-library.org/..." />
-      </div>
-
-      <div class="checkbox-row">
-        <input type="checkbox" id="shareableInput" checked />
-        <label for="shareableInput">Show Download + Share on this page</label>
-      </div>
-
-      <div class="checkbox-row">
-        <input type="checkbox" id="landingInput" />
-        <label for="landingInput">This is the landing page</label>
-      </div>
-
-      <button type="submit" class="btn-toolbar btn-save" id="submitBtn">+ Add Page</button>
-      <div class="status-msg" id="formStatus"></div>
-    </form>
-
-    <div id="slider-archive">
-      <h2>Archive — Saved Pages</h2>
-      <table>
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>Shape</th>
-            <th>Media</th>
-            <th>Source</th>
-            <th>Shareable</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody id="archiveBody"></tbody>
-      </table>
     </div>
-  </div>
+
+    <!-- ── SLIDER BUILDER — two panel ── -->
+    <div class="two-panel">
+
+      <!-- LEFT — selected page preview + edit fields -->
+      <div class="panel-left">
+        <div class="nav-header">
+          <span>Selected Page</span>
+          <button class="btn-toolbar btn-save" id="addPageBtn" style="padding:4px 10px;font-size:11px;">+ Add</button>
+        </div>
+
+        <div class="card-preview-large shape-portrait" id="cardPreviewLarge">
+          <div class="card-preview-empty">No pages yet<br/>Click + Add</div>
+        </div>
+
+        <div class="nav-controls">
+          <button class="icon-btn" id="navPrev" title="Previous">
+            <svg viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7"/></svg>
+          </button>
+          <span class="nav-counter" id="navCounter">0 of 0</span>
+          <button class="icon-btn" id="navNext" title="Next">
+            <svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>
+          </button>
+        </div>
+
+        <form class="page-form" id="pageForm">
+          <div>
+            <label for="pageType">Page shape</label>
+            <select id="pageType">
+              <option value="portrait">Portrait (9:16)</option>
+              <option value="landscape">Landscape (16:9)</option>
+              <option value="square">Square (1:1)</option>
+            </select>
+          </div>
+          <div>
+            <label for="mediaType">Media type</label>
+            <select id="mediaType">
+              <option value="image">Image</option>
+              <option value="video">Video</option>
+              <option value="audio">Audio</option>
+            </select>
+          </div>
+          <div>
+            <label for="fileInput">Upload new file</label>
+            <input type="file" id="fileInput" />
+          </div>
+          <div>
+            <label for="urlInput">— OR — R2 URL</label>
+            <input type="text" id="urlInput" placeholder="https://files.3c-public-library.org/..." />
+          </div>
+          <div class="checkbox-row">
+            <input type="checkbox" id="shareableInput" checked />
+            <label for="shareableInput">Show Download + Share</label>
+          </div>
+          <button type="submit" class="btn-toolbar btn-save" id="submitBtn">Save Page</button>
+          <div style="display:flex; gap:6px; margin-top:6px;">
+            <button type="button" class="icon-btn" id="copyUrlBtn" title="Copy public URL">
+              <svg viewBox="0 0 24 24"><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.2 10.8l7.6-4.6M8.2 13.2l7.6 4.6"/></svg>
+            </button>
+            <button type="button" class="icon-btn" id="openUrlBtn" title="Open in new tab">
+              <svg viewBox="0 0 24 24"><path d="M9 15l6-6M10 6l1-1a4 4 0 0 1 6 6l-1 1M14 18l-1 1a4 4 0 0 1-6-6l1-1"/></svg>
+            </button>
+          </div>
+          <div class="status-msg" id="formStatus"></div>
+        </form>
+      </div>
+
+      <!-- RIGHT — thumbnail grid: click to select, reorder, remove -->
+      <div class="panel-right">
+        <div class="grid-header">
+          <span>All Pages</span>
+          <span class="card-count-badge" id="cardCount">0 pages</span>
+        </div>
+        <div id="card-grid">
+          <div style="grid-column:1/-1;text-align:center;padding:40px;font-size:13px;color:var(--text-muted);">
+            No pages added yet. Click + Add to start.
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /two-panel -->
+
+  </div><!-- /admin-wrap -->
 
   <script type="module" src="js/admin.js"></script>
 </body>
