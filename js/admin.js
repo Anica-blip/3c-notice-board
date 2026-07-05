@@ -9,7 +9,7 @@
 // whichever pages still have a pending file.
 
 import { requireLogin, authFetch, logout, WORKER_BASE } from './auth.js';
-import { icon } from './icons.js';
+import { icon } from './icon.js';
 
 requireLogin();
 document.getElementById('logoutBtn').addEventListener('click', logout);
