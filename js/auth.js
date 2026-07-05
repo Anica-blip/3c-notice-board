@@ -5,7 +5,7 @@
 // this front-end and the Worker are different origins). Update
 // WORKER_BASE once you know your deployed Worker's address.
 
-const WORKER_BASE = 'https://3c-notice-board.YOUR-SUBDOMAIN.workers.dev'; // ⚠️ replace after first deploy
+const WORKER_BASE = 'https://3c-notice-board.3c-innertherapy.workers.dev';
 const TOKEN_KEY = '3c_nb_token';
 
 export function redirectToLogin() {
