@@ -1,7 +1,9 @@
 // public/viewer.js — 3C Notice Board public viewer
-// No login. Requires ?project=<id> in the URL — each project is its
-// own saved slider. Pages arrive newest-first (array order from the
-// Worker), so pages[0] is shown first — "last added comes first."
+// No login. Requires ?project=<id> in the URL. Pages are stored in the
+// order they were created (page 1 first, matching the admin builder
+// exactly — same as Showcase's addCard/push). The viewer itself is
+// what starts on the LAST page and moves backward as you go "next" —
+// that's a display choice here, not how the data is stored.
 
 import { WORKER_BASE } from '../js/auth.js';
 import { icon } from '../js/icons.js';
@@ -29,6 +31,7 @@ async function loadPages() {
   try {
     const res = await fetch(`${WORKER_BASE}/api/projects/${encodeURIComponent(projectId)}/pages`);
     pages = await res.json();
+    current = pages.length ? pages.length - 1 : 0; // start on the LAST page
     render();
   } catch (err) {
     stage.innerHTML = `<p>Could not load this project: ${err.message}</p>`;
@@ -108,11 +111,11 @@ function renderActions(page, src) {
 }
 
 prevBtn.addEventListener('click', () => {
-  current = current > 0 ? current - 1 : pages.length - 1;
+  current = current < pages.length - 1 ? current + 1 : 0;
   render();
 });
 nextBtn.addEventListener('click', () => {
-  current = current < pages.length - 1 ? current + 1 : 0;
+  current = current > 0 ? current - 1 : pages.length - 1;
   render();
 });
 
