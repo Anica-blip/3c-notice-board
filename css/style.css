@@ -221,6 +221,7 @@ body {
 }
 .card-preview-large {
   width: 100%;
+  aspect-ratio: 3/4;
   background: var(--surface-3);
   border: 1px solid var(--border-light);
   border-radius: 10px;
@@ -229,21 +230,9 @@ body {
   margin-bottom: 12px;
   position: relative;
 }
-.card-preview-large.shape-portrait { aspect-ratio: 9/16; }
-.card-preview-large.shape-landscape { aspect-ratio: 16/9; }
-.card-preview-large.shape-square { aspect-ratio: 1/1; }
 .card-preview-large img,
-.card-preview-large video { width: 100%; height: 100%; object-fit: cover; }
+.card-preview-large video { width: 100%; height: 100%; object-fit: contain; }
 .card-preview-empty { font-size: 11px; color: var(--text-muted); text-align: center; padding: 16px; }
-.media-type-badge {
-  position: absolute; top: 8px; left: 8px;
-  background: rgba(10,7,20,0.75);
-  border: 1px solid var(--border-light);
-  border-radius: 6px;
-  padding: 2px 8px;
-  font-size: 10px; font-weight: 700;
-  color: var(--text-accent); text-transform: uppercase; letter-spacing: 0.05em;
-}
 
 .nav-controls {
   display: flex; align-items: center; justify-content: center; gap: 10px;
@@ -283,14 +272,15 @@ body {
 
 #card-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
-  gap: 16px 12px;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
 }
 .grid-card {
   position: relative;
   background: var(--surface-3);
   border: 1.5px solid var(--border);
   border-radius: 8px;
+  overflow: visible;
   cursor: pointer;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
@@ -298,14 +288,12 @@ body {
 .grid-card.selected { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-glow); }
 
 .grid-card-thumb {
-  width: 100%; object-fit: cover; border-radius: 6px; display: block;
+  width: 100%; aspect-ratio: 3/4; object-fit: cover; object-position: center;
+  border-radius: 6px; display: block;
 }
-.grid-card-thumb.shape-portrait { aspect-ratio: 9/16; }
-.grid-card-thumb.shape-landscape { aspect-ratio: 16/9; }
-.grid-card-thumb.shape-square { aspect-ratio: 1/1; }
 
 .grid-card-icon {
-  width: 100%; aspect-ratio: 1/1;
+  width: 100%; aspect-ratio: 3/4;
   display: flex; align-items: center; justify-content: center;
   border-radius: 6px;
   color: var(--text-accent);
