@@ -8,9 +8,10 @@
 // R2 only happens for real when you click Save, one pass over
 // whichever pages still have a pending file.
 
-import { authFetch, logout, WORKER_BASE } from './auth.js';
+import { requireLogin, authFetch, logout, WORKER_BASE } from './auth.js';
 import { icon } from './icons.js';
 
+requireLogin();
 document.getElementById('logoutBtn').addEventListener('click', logout);
 
 function friendlyError(err) {
