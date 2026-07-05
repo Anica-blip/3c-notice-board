@@ -21,16 +21,22 @@ bucket_name = "3c-library-files"
 
 # Non-secret config — safe to commit
 [vars]
-# Where the page index lives inside the bucket (one JSON file, no DB)
-MANIFEST_KEY = "notice-board/manifest.json"
-# Where the single landing-page cover lives — entirely separate from
-# the numbered slider pages above
-LANDING_KEY = "notice-board/landing.json"
+# Index of all saved projects — each project then owns its own folder
+# (notice-board/{id}-{slug}/) containing manifest.json, landing.json,
+# and media/. No separate MANIFEST_KEY/LANDING_KEY needed here anymore
+# — the Worker computes those per-project.
+PROJECTS_KEY = "notice-board/projects.json"
+
 # Where newly uploaded media files are stored inside the bucket
 MEDIA_PREFIX = "notice-board/media/"
 # Public CDN base already configured for this bucket — uploaded files
 # are served from PUBLIC_MEDIA_BASE + r2_key
 PUBLIC_MEDIA_BASE = "https://files.3c-public-library.org/"
+
+# Base URL of the deployed GitHub Pages site — used to build each
+# project's cloudflare_url (public viewer link), e.g.
+# {PUBLIC_SITE_BASE}/public/?project=01
+PUBLIC_SITE_BASE = "https://anica-blip.github.io/3c-notice-board"
 
 # Shared "Anica-blip Tools" GitHub OAuth App — same Client ID used
 # across your other worker.js setups. Only the Secret and this
