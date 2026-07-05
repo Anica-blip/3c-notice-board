@@ -1,4 +1,11 @@
 # 3C Notice Board
+
+⚖️ This repository is protected under a binding Legal Disclaimer that governs all use, cloning, and forking from the date of inception. Please read before use.
+
+The private content archive and production hub of the 3C Thread To Success™ ecosystem. Where every piece of registered content — its category, persona, format, platform and distribution details — gets filed, tracked, and retrieved.
+
+⚠️ Intellectual Property Notice This repository is open source under the MIT License — the code skeleton is free to clone and adapt. The 3C Thread To Success™ brand, including its name, structure, characters (Caelum, Aurion, Jan, Anica), persona system (Falcon, Panther, Wolf, Lion), philosophy, and overall ecosystem identity remains the intellectual property of the creator and is not included in this license. Commercial use of the brand or replication of the ecosystem identity is not permitted without permission.
+
 This project is part of the 3C Thread To Success™ ecosystem — a growing digital platform that combines creativity, structure, and real-world application.
 
 The 3C Thread To Success™ brand, including its name, structure, characters (Aurion 3C Mascot), and overall system design, remains the intellectual property of the creator and is not included in this license.
