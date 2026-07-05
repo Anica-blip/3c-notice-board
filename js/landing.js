@@ -4,9 +4,7 @@
 // No Supabase — this project has none; the two steps here are upload
 // to R2, then update that project's landing.json.
 
-import { requireLogin, authFetch, logout } from './auth.js';
-
-requireLogin();
+import { authFetch } from './auth.js';
 
 const projectSelect      = document.getElementById('projectSelect');
 const uploadArea         = document.getElementById('uploadArea');
