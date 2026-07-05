@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>3C Notice Board — Admin</title>
+  <link rel="icon" type="image/png" href="assets/favicon.png" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+  <div class="admin-wrap">
+    <div class="admin-header">
+      <h1 class="neon-title" style="margin:0;">3C Notice Board — Admin</h1>
+      <button class="icon-btn" id="logoutBtn" title="Log out"></button>
+    </div>
+
+    <form class="page-form" id="pageForm">
+      <div class="row">
+        <div>
+          <label for="pageType">Page shape</label>
+          <select id="pageType" required>
+            <option value="portrait">Portrait (9:16)</option>
+            <option value="landscape">Landscape (16:9)</option>
+            <option value="square">Square (1:1)</option>
+          </select>
+        </div>
+        <div>
+          <label for="mediaType">Media type</label>
+          <select id="mediaType" required>
+            <option value="image">Image</option>
+            <option value="video">Video</option>
+            <option value="audio">Audio</option>
+          </select>
+        </div>
+      </div>
+
+      <div>
+        <label for="fileInput">Upload new file</label>
+        <input type="file" id="fileInput" />
+      </div>
+
+      <div>
+        <label for="urlInput">— OR — link an existing Cloudflare/R2 URL</label>
+        <input type="text" id="urlInput" placeholder="https://files.3c-public-library.org/..." />
+      </div>
+
+      <div class="checkbox-row">
+        <input type="checkbox" id="shareableInput" checked />
+        <label for="shareableInput" style="margin:0;">Show Download + Share on this page</label>
+      </div>
+
+      <div class="checkbox-row">
+        <input type="checkbox" id="landingInput" />
+        <label for="landingInput" style="margin:0;">This is the landing page</label>
+      </div>
+
+      <button type="submit" class="btn"><span id="submitIcon"></span> Add Page</button>
+      <div class="status-msg" id="formStatus"></div>
+    </form>
+
+    <div class="page-list" id="pageList"></div>
+
+    <div class="watermark">
+      Designed and Built with ❤️ by Claude (Anthropic) × Chef Anica · 3C Thread To Success™ Cooking Lab 🧪👨‍🍳
+    </div>
+  </div>
+
+  <script type="module" src="js/admin.js"></script>
+</body>
+</html>
