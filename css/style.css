@@ -1,0 +1,200 @@
+:root {
+  --purple-dark: #523474;
+  --blue-accent: #61d8e6;
+  --beige-accent: #a49079;
+  --cream-bg: #ddd5c9;
+  --indigo: #3c3678;
+
+  --neon-purple: #c77dff;
+  --neon-purple-glow: rgba(199, 125, 255, 0.55);
+
+  --btn-bg: rgba(80, 104, 143, 0.28);
+  --btn-border: rgba(97, 216, 230, 0.22);
+  --btn-hover-bg: rgba(97, 216, 230, 0.22);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  font-family: 'Inter', Arial, sans-serif;
+  background: var(--purple-dark);
+  margin: 0;
+  min-height: 100vh;
+  color: #fff;
+}
+
+/* ── Neon light-purple title, ~32px ── */
+.neon-title {
+  font-family: 'Arimo', Arial, sans-serif;
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--neon-purple);
+  text-shadow: 0 0 6px var(--neon-purple-glow), 0 0 18px var(--neon-purple-glow);
+  text-align: center;
+  margin: 14px 0 6px 0;
+}
+
+/* ── Login card (shared by admin login) ── */
+.login-wrap {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.login-card {
+  max-width: 380px;
+  width: 100%;
+  text-align: center;
+  background: rgba(255,255,255,0.06);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(199, 125, 255, 0.22);
+  border-radius: 18px;
+  padding: 32px 24px;
+}
+.login-card .logo {
+  width: 72px;
+  border-radius: 50%;
+  margin-bottom: 10px;
+}
+.login-card .tagline {
+  color: rgba(255,255,255,0.65);
+  font-size: 0.95rem;
+  margin-bottom: 22px;
+}
+
+/* ── Buttons (symbols, not emojis) ── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: center;
+  font-family: 'Inter', Arial, sans-serif;
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: #fff;
+  text-decoration: none;
+  background: var(--btn-bg);
+  border: 1px solid var(--btn-border);
+  border-radius: 10px;
+  padding: 11px 22px;
+  cursor: pointer;
+  transition: background 0.18s, border-color 0.18s, transform 0.14s;
+}
+.btn:hover {
+  background: var(--btn-hover-bg);
+  border-color: rgba(97, 216, 230, 0.5);
+  transform: translateY(-2px);
+}
+.btn svg { width: 18px; height: 18px; fill: currentColor; stroke: currentColor; stroke-width: 1.6; fill: none; }
+
+/* ── Icon button (shared by admin + public) ── */
+.icon-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid rgba(97, 216, 230, 0.25);
+  background: rgba(255,255,255,0.06);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.icon-btn:hover {
+  background: rgba(97, 216, 230, 0.2);
+  border-color: rgba(97, 216, 230, 0.5);
+}
+.icon-btn svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; }
+
+.watermark {
+  position: fixed;
+  bottom: 8px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 0.72rem;
+  color: rgba(255,255,255,0.35);
+}
+.icon-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid rgba(97, 216, 230, 0.25);
+  background: rgba(255,255,255,0.06);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.icon-btn:hover {
+  background: rgba(97, 216, 230, 0.2);
+  border-color: rgba(97, 216, 230, 0.5);
+}
+.icon-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; }
+
+.admin-wrap {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 24px 16px 80px;
+}
+.admin-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+
+.page-form {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(199,125,255,0.2);
+  border-radius: 14px;
+  padding: 18px;
+  margin-bottom: 24px;
+  display: grid;
+  gap: 12px;
+}
+.page-form label {
+  font-size: 0.85rem;
+  color: rgba(255,255,255,0.7);
+  display: block;
+  margin-bottom: 4px;
+}
+.page-form select,
+.page-form input[type="text"],
+.page-form input[type="file"] {
+  width: 100%;
+  padding: 9px;
+  border-radius: 8px;
+  border: 1px solid rgba(97,216,230,0.25);
+  background: rgba(255,255,255,0.08);
+  color: #fff;
+}
+.page-form .row { display: flex; gap: 12px; flex-wrap: wrap; }
+.page-form .row > div { flex: 1; min-width: 140px; }
+.page-form .checkbox-row { display: flex; align-items: center; gap: 8px; }
+
+.page-list { display: grid; gap: 10px; }
+.page-card {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(97,216,230,0.15);
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.page-card .meta { font-size: 0.85rem; color: rgba(255,255,255,0.7); }
+.page-card .actions { display: flex; gap: 6px; }
+
+.status-msg {
+  font-size: 0.85rem;
+  color: var(--blue-accent);
+  margin-top: 6px;
+  min-height: 1.1em;
+}
