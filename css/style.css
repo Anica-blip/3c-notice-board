@@ -288,12 +288,12 @@ body {
 .grid-card.selected { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-glow); }
 
 .grid-card-thumb {
-  width: 100%; aspect-ratio: 3/4; object-fit: cover; object-position: center;
+  width: 100%; aspect-ratio: 1/1; object-fit: cover; object-position: center;
   border-radius: 6px; display: block;
 }
 
 .grid-card-icon {
-  width: 100%; aspect-ratio: 3/4;
+  width: 100%; aspect-ratio: 1/1;
   display: flex; align-items: center; justify-content: center;
   border-radius: 6px;
   color: var(--text-accent);
