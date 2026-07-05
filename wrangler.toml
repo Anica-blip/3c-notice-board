@@ -23,6 +23,9 @@ bucket_name = "3c-library-files"
 [vars]
 # Where the page index lives inside the bucket (one JSON file, no DB)
 MANIFEST_KEY = "notice-board/manifest.json"
+# Where the single landing-page cover lives — entirely separate from
+# the numbered slider pages above
+LANDING_KEY = "notice-board/landing.json"
 # Where newly uploaded media files are stored inside the bucket
 MEDIA_PREFIX = "notice-board/media/"
 # Public CDN base already configured for this bucket — uploaded files
