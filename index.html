@@ -23,6 +23,12 @@
       <h1 class="neon-title">3C Notice Board — Admin</h1>
     </div>
     <div id="toolbar-right">
+      <button class="icon-btn" id="saveProjectBtn" title="Save Project">
+        <svg viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4-6 4Z"/></svg>
+      </button>
+      <a class="icon-btn" href="landing.html" title="Landing Cover">
+        <svg viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+      </a>
       <button class="icon-btn" id="logoutBtn" title="Log out">
         <svg viewBox="0 0 24 24"><path d="M9 4H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h4M15 16l5-5-5-5M20 11H9"/></svg>
       </button>
@@ -31,32 +37,19 @@
 
   <div class="admin-wrap">
 
-    <!-- ── LANDING COVER — separate from the slider ── -->
-    <div class="landing-section">
-      <h2>Landing Cover</h2>
-      <div class="field-hint">
-        The single image shown before entering the board — not one of the numbered slider pages below.
+    <!-- ── NEW TITLE ── -->
+    <div class="title-row">
+      <div style="flex:1;">
+        <label for="projectTitleInput">New Title</label>
+        <input type="text" id="projectTitleInput" placeholder="e.g. News, Announcements…" />
       </div>
-      <div class="landing-workspace">
-        <div>
-          <label class="landing-upload-area" for="landingFileInput">
-            <input type="file" id="landingFileInput" accept="image/*" />
-            <p>Click or drag an image here<br><strong>or</strong> paste an R2 URL below</p>
-          </label>
-          <div style="margin-top:10px;">
-            <input type="text" id="landingUrlInput" placeholder="https://files.3c-public-library.org/..." />
-          </div>
-          <button class="btn-toolbar btn-save" id="landingSaveBtn" style="margin-top:10px;">Save Landing Cover</button>
-          <div class="status-msg" id="landingStatus"></div>
-        </div>
-        <div class="landing-preview" id="landingPreview">No cover set</div>
-      </div>
+      <span class="project-id-badge" id="projectIdBadge">Unsaved</span>
     </div>
+    <div class="status-msg" id="projectStatus"></div>
 
     <!-- ── SLIDER BUILDER — two panel ── -->
     <div class="two-panel">
 
-      <!-- LEFT — selected page preview + edit fields -->
       <div class="panel-left">
         <div class="nav-header">
           <span>Selected Page</span>
@@ -64,7 +57,7 @@
         </div>
 
         <div class="card-preview-large shape-portrait" id="cardPreviewLarge">
-          <div class="card-preview-empty">No pages yet<br/>Click + Add</div>
+          <div class="card-preview-empty">Save a project title first<br/>then add pages</div>
         </div>
 
         <div class="nav-controls">
@@ -119,7 +112,6 @@
         </form>
       </div>
 
-      <!-- RIGHT — thumbnail grid: click to select, reorder, remove -->
       <div class="panel-right">
         <div class="grid-header">
           <span>All Pages</span>
@@ -127,12 +119,29 @@
         </div>
         <div id="card-grid">
           <div style="grid-column:1/-1;text-align:center;padding:40px;font-size:13px;color:var(--text-muted);">
-            No pages added yet. Click + Add to start.
+            Save a project title above to start adding pages.
           </div>
         </div>
       </div>
 
     </div><!-- /two-panel -->
+
+    <!-- ── ARCHIVE — saved projects ── -->
+    <div id="projects-archive">
+      <h2>Archive — Saved Projects</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Title</th>
+            <th>Pages</th>
+            <th>Cloudflare URL</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="archiveBody"></tbody>
+      </table>
+    </div>
 
   </div><!-- /admin-wrap -->
 
