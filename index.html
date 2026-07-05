@@ -40,10 +40,13 @@
     <!-- ── NEW TITLE ── -->
     <div class="title-row">
       <div style="flex:1;">
-        <label for="projectTitleInput">New Title</label>
+        <label id="titleLabel" for="projectTitleInput">New Title #—</label>
         <input type="text" id="projectTitleInput" placeholder="e.g. News, Announcements…" />
       </div>
-      <span class="project-id-badge" id="projectIdBadge">Unsaved</span>
+      <div style="flex:1;">
+        <label for="projectUrlDisplay">Cloudflare URL</label>
+        <input type="text" id="projectUrlDisplay" readonly placeholder="Generates when you save" />
+      </div>
     </div>
     <div class="status-msg" id="projectStatus"></div>
 
@@ -56,7 +59,7 @@
           <button class="btn-toolbar btn-save" id="addPageBtn" style="padding:4px 10px;font-size:11px;">+ Add</button>
         </div>
 
-        <div class="card-preview-large shape-portrait" id="cardPreviewLarge">
+        <div class="card-preview-large" id="cardPreviewLarge">
           <div class="card-preview-empty">No pages yet<br/>Click + Add</div>
         </div>
 
@@ -71,14 +74,6 @@
         </div>
 
         <form class="page-form" id="pageForm">
-          <div>
-            <label for="pageType">Page shape</label>
-            <select id="pageType">
-              <option value="portrait">Portrait (9:16)</option>
-              <option value="landscape">Landscape (16:9)</option>
-              <option value="square">Square (1:1)</option>
-            </select>
-          </div>
           <div>
             <label for="mediaType">Media type</label>
             <select id="mediaType">
@@ -97,17 +92,9 @@
           </div>
           <div class="checkbox-row">
             <input type="checkbox" id="shareableInput" checked />
-            <label for="shareableInput">Show Download + Share</label>
+            <label for="shareableInput">Show Download + Share (on the public page)</label>
           </div>
           <button type="submit" class="btn-toolbar btn-save" id="submitBtn">Update Page</button>
-          <div style="display:flex; gap:6px; margin-top:6px;">
-            <button type="button" class="icon-btn" id="copyUrlBtn" title="Copy public URL">
-              <svg viewBox="0 0 24 24"><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.2 10.8l7.6-4.6M8.2 13.2l7.6 4.6"/></svg>
-            </button>
-            <button type="button" class="icon-btn" id="openUrlBtn" title="Open in new tab">
-              <svg viewBox="0 0 24 24"><path d="M9 15l6-6M10 6l1-1a4 4 0 0 1 6 6l-1 1M14 18l-1 1a4 4 0 0 1-6-6l1-1"/></svg>
-            </button>
-          </div>
           <div class="status-msg" id="formStatus"></div>
         </form>
       </div>
