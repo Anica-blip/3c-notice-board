@@ -48,9 +48,7 @@ const pageForm    = document.getElementById('pageForm');
 const formStatus  = document.getElementById('formStatus');
 const submitBtn   = document.getElementById('submitBtn');
 
-const mediaTypeInput = document.getElementById('mediaType');
-const fileInput      = document.getElementById('fileInput');
-const urlInput       = document.getElementById('urlInput');
+const pageDetails = document.getElementById('pageDetails');
 const shareableInput = document.getElementById('shareableInput');
 
 const archiveBody = document.getElementById('archiveBody');
@@ -267,8 +265,7 @@ function renderSelected() {
   if (!page) {
     cardPreviewLarge.innerHTML = '<div class="card-preview-empty">No pages yet<br/>Click + Add</div>';
     navCounter.textContent = '0 of 0';
-    fileInput.value = '';
-    urlInput.value = '';
+    pageDetails.innerHTML = '';
     pageForm.style.opacity = '0.4';
     pageForm.style.pointerEvents = 'none';
     return;
@@ -296,12 +293,77 @@ function renderSelected() {
   navCounter.textContent = `${selectedIndex + 1} of ${pages.length}`;
   navPrev.disabled = selectedIndex <= 0;
   navNext.disabled = selectedIndex >= pages.length - 1;
-
-  mediaTypeInput.value = page.media_type;
-  urlInput.value       = page.external_url || '';
   shareableInput.checked = !!page.shareable;
-  fileInput.value = '';
-  submitBtn.textContent = 'Update Page';
+
+  // Rebuilt every time, exactly like builder.js's card-details —
+  // media-type button group, then a green upload button whose label
+  // switches with the type, then the R2-URL fallback row.
+  const acceptType = page.media_type === 'video' ? 'video/*' : page.media_type === 'audio' ? 'audio/*' : 'image/*';
+  const uploadLabel = page.media_type === 'video' ? 'Upload Video' : page.media_type === 'audio' ? 'Upload Audio' : 'Upload Image';
+
+  pageDetails.innerHTML = `
+    <div class="card-detail-row">
+      <label class="field-label">Media Type</label>
+      <div class="shape-selector">
+        <button type="button" class="shape-btn ${page.media_type === 'image' ? 'active' : ''}" data-media="image">Image</button>
+        <button type="button" class="shape-btn ${page.media_type === 'video' ? 'active' : ''}" data-media="video">Video</button>
+        <button type="button" class="shape-btn ${page.media_type === 'audio' ? 'active' : ''}" data-media="audio">Audio</button>
+      </div>
+    </div>
+    <div class="card-detail-row" style="margin-top:10px;">
+      <label class="upload-btn-green" for="fileInput">⇧ ${uploadLabel}</label>
+      <input type="file" id="fileInput" accept="${acceptType}" style="display:none;" />
+      <div class="r2-url-row">
+        <span class="r2-or">or paste R2 URL</span>
+        <input type="text" id="urlInput" class="r2-url-input" placeholder="https://files.3c-public-library.org/…" value="${page.external_url || ''}" />
+      </div>
+    </div>
+  `;
+
+  pageDetails.querySelectorAll('[data-media]').forEach(btn => {
+    btn.addEventListener('click', () => setMediaType(btn.dataset.media));
+  });
+
+  document.getElementById('fileInput').addEventListener('change', handleFileChange);
+  document.getElementById('urlInput').addEventListener('input', handleUrlInput);
+}
+
+function setMediaType(type) {
+  const page = selectedPage();
+  if (!page) return;
+  page.media_type = type;
+  page.localPreview = '';
+  delete pendingFiles[page.id];
+  renderSelected();
+  renderGrid();
+}
+
+function handleFileChange(e) {
+  const page = selectedPage();
+  const file = e.target.files[0];
+  if (!page || !file) return;
+
+  pendingFiles[page.id] = file;
+  page.localPreview = URL.createObjectURL(file);
+  page.r2_key = null;
+  page.external_url = null;
+
+  renderGrid();
+  renderSelected();
+}
+
+function handleUrlInput(e) {
+  const page = selectedPage();
+  if (!page) return;
+  const url = e.target.value.trim();
+
+  page.external_url = url || null;
+  if (url) {
+    page.r2_key = null;
+    page.localPreview = '';
+    delete pendingFiles[page.id];
+  }
+  renderGrid();
 }
 
 function renderGrid() {
@@ -386,8 +448,8 @@ addPageBtn.addEventListener('click', () => {
     shareable: true,
     localPreview: '',
   };
-  pages.unshift(newPage);
-  selectedIndex = 0;
+  pages.push(newPage);
+  selectedIndex = pages.length - 1;
   renderGrid();
   renderSelected();
 });
@@ -395,47 +457,15 @@ addPageBtn.addEventListener('click', () => {
 navPrev.addEventListener('click', () => { if (selectedIndex > 0) { selectedIndex--; renderGrid(); renderSelected(); } });
 navNext.addEventListener('click', () => { if (selectedIndex < pages.length - 1) { selectedIndex++; renderGrid(); renderSelected(); } });
 
-fileInput.addEventListener('change', () => {
-  const page = selectedPage();
-  const file = fileInput.files[0];
-  if (!page || !file) return;
-
-  pendingFiles[page.id] = file;
-  page.localPreview = URL.createObjectURL(file);
-  page.r2_key = null;
-  page.external_url = null;
-  urlInput.value = '';
-
-  renderGrid();
-  renderSelected();
-});
-
-urlInput.addEventListener('input', () => {
-  const page = selectedPage();
-  if (!page) return;
-  const url = urlInput.value.trim();
-
-  page.external_url = url || null;
-  if (url) {
-    page.r2_key = null;
-    page.localPreview = '';
-    delete pendingFiles[page.id];
-    fileInput.value = '';
-  }
-  renderGrid();
-});
-
 pageForm.addEventListener('submit', (e) => {
   e.preventDefault();
   const page = selectedPage();
   if (!page) return;
 
-  page.media_type = mediaTypeInput.value;
-  page.shareable  = shareableInput.checked;
+  page.shareable = shareableInput.checked;
 
   formStatus.textContent = 'Updated locally — click Save (top of page) to persist.';
   renderGrid();
-  renderSelected();
 });
 
 /* ══════════════════ INIT ══════════════════ */
