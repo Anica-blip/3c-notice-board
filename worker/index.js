@@ -38,7 +38,7 @@ export default {
       if (path === '/auth/callback') return handleCallback(request, url, env);
       if (path === '/auth/me')       return corsResponse(env, await handleMe(request, env));
 
-      // ── Projects ──
+      // ── Projects — whole-document save: title + pages together ──
       if (path === '/api/projects' && request.method === 'GET')
         return corsResponse(env, await guarded(request, env, () => listProjects(env)));
 
@@ -48,30 +48,18 @@ export default {
       const projectMatch = path.match(/^\/api\/projects\/([^/]+)$/);
       if (projectMatch) {
         const id = decodeURIComponent(projectMatch[1]);
-        if (request.method === 'PUT')    return corsResponse(env, await guarded(request, env, () => renameProject(id, request, env)));
+        if (request.method === 'PUT')    return corsResponse(env, await guarded(request, env, () => saveProject(id, request, env)));
         if (request.method === 'DELETE') return corsResponse(env, await guarded(request, env, () => deleteProject(id, env)));
       }
 
-      // ── Project-scoped pages ──
+      // Pages are read-only via the API — the public viewer and the
+      // admin's "Edit" load both just need the current snapshot.
+      // Pages are only ever WRITTEN as part of a whole project save
+      // (POST/PUT above), never one at a time.
       const pagesMatch = path.match(/^\/api\/projects\/([^/]+)\/pages$/);
-      if (pagesMatch) {
+      if (pagesMatch && request.method === 'GET') {
         const id = decodeURIComponent(pagesMatch[1]);
-        if (request.method === 'GET')  return corsResponse(env, await listPages(id, env));
-        if (request.method === 'POST') return corsResponse(env, await guarded(request, env, () => createPage(id, request, env)));
-      }
-
-      const reorderMatch = path.match(/^\/api\/projects\/([^/]+)\/pages\/reorder$/);
-      if (reorderMatch && request.method === 'POST') {
-        const id = decodeURIComponent(reorderMatch[1]);
-        return corsResponse(env, await guarded(request, env, () => reorderPages(id, request, env)));
-      }
-
-      const pageMatch = path.match(/^\/api\/projects\/([^/]+)\/pages\/([^/]+)$/);
-      if (pageMatch) {
-        const id = decodeURIComponent(pageMatch[1]);
-        const pageId = decodeURIComponent(pageMatch[2]);
-        if (request.method === 'PUT')    return corsResponse(env, await guarded(request, env, () => updatePage(id, pageId, request, env)));
-        if (request.method === 'DELETE') return corsResponse(env, await guarded(request, env, () => deletePage(id, pageId, env)));
+        return corsResponse(env, await listPages(id, env));
       }
 
       // ── Project-scoped landing cover ──
@@ -82,12 +70,11 @@ export default {
         if (request.method === 'PUT') return corsResponse(env, await guarded(request, env, () => setLanding(id, request, env)));
       }
 
-      // ── Project-scoped upload ──
-      const uploadMatch = path.match(/^\/api\/projects\/([^/]+)\/upload$/);
-      if (uploadMatch && request.method === 'POST') {
-        const id = decodeURIComponent(uploadMatch[1]);
-        return corsResponse(env, await guarded(request, env, () => uploadMedia(id, request, env)));
-      }
+      // ── Upload — generic, not project-scoped. Needed before a
+      // project even exists yet, since title+cards are built up in
+      // the browser first and only saved together at the end. ──
+      if (path === '/api/upload' && request.method === 'POST')
+        return corsResponse(env, await guarded(request, env, () => uploadMedia(env, request)));
 
       return corsResponse(env, jsonResponse({ error: 'Not found' }, 404));
     } catch (err) {
@@ -206,12 +193,13 @@ async function listProjects(env) {
 }
 
 async function createProject(request, env) {
-  const { title } = await request.json();
+  const { title, pages } = await request.json();
   const projects = await readProjectsIndex(env);
 
   const id     = nextProjectId(projects);
   const slug   = slugify(title);
   const folder = `notice-board/${id}-${slug}/`;
+  const finalPages = assignPageIds(pages || []);
 
   const project = {
     id,
@@ -219,7 +207,7 @@ async function createProject(request, env) {
     slug,
     folder,
     cloudflare_url: `${env.PUBLIC_SITE_BASE}/public/?project=${id}`,
-    page_count: 0,
+    page_count: finalPages.length,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
@@ -227,24 +215,48 @@ async function createProject(request, env) {
   projects.unshift(project);
   await writeProjectsIndex(env, projects);
 
-  // Seed an empty pages manifest so listPages never has to guess
-  await env.NOTICE_BUCKET.put(`${folder}manifest.json`, '[]', {
+  await env.NOTICE_BUCKET.put(`${folder}manifest.json`, JSON.stringify(finalPages), {
     httpMetadata: { contentType: 'application/json' },
   });
 
-  return jsonResponse(project, 201);
+  return jsonResponse({ ...project, pages: finalPages }, 201);
 }
 
-async function renameProject(id, request, env) {
-  const { title } = await request.json();
+// Assigns page-XXX ids only to entries that don't already have one —
+// pages loaded from an existing project keep their stable id (so
+// share links survive a reorder or edit), new ones get the next
+// number in sequence.
+function assignPageIds(pages) {
+  let max = pages.reduce((m, p) => {
+    const match = /^page-(\d+)$/.exec(p.id || '');
+    return match ? Math.max(m, parseInt(match[1], 10)) : m;
+  }, 0);
+
+  return pages.map(p => {
+    if (/^page-\d+$/.test(p.id || '')) return p;
+    max++;
+    return { ...p, id: `page-${String(max).padStart(3, '0')}` };
+  });
+}
+
+async function saveProject(id, request, env) {
+  const { title, pages } = await request.json();
   const projects = await readProjectsIndex(env);
   const idx = projects.findIndex(p => p.id === id);
   if (idx === -1) return jsonResponse({ error: 'Project not found' }, 404);
 
-  projects[idx].title = title || projects[idx].title;
+  const finalPages = assignPageIds(pages || []);
+
+  projects[idx].title      = title || projects[idx].title;
+  projects[idx].page_count = finalPages.length;
   projects[idx].updated_at = new Date().toISOString();
   await writeProjectsIndex(env, projects);
-  return jsonResponse(projects[idx]);
+
+  await env.NOTICE_BUCKET.put(`${projects[idx].folder}manifest.json`, JSON.stringify(finalPages), {
+    httpMetadata: { contentType: 'application/json' },
+  });
+
+  return jsonResponse({ ...projects[idx], pages: finalPages });
 }
 
 async function deleteProject(id, env) {
@@ -278,92 +290,9 @@ async function readManifest(project, env) {
   try { return await file.json(); } catch { return []; }
 }
 
-async function writeManifest(project, env, pages) {
-  await env.NOTICE_BUCKET.put(`${project.folder}manifest.json`, JSON.stringify(pages), {
-    httpMetadata: { contentType: 'application/json' },
-  });
-  await syncPageCount(project.id, env, pages.length);
-}
-
-async function syncPageCount(id, env, count) {
-  const projects = await readProjectsIndex(env);
-  const idx = projects.findIndex(p => p.id === id);
-  if (idx === -1) return;
-  projects[idx].page_count = count;
-  projects[idx].updated_at = new Date().toISOString();
-  await writeProjectsIndex(env, projects);
-}
-
 async function listPages(id, env) {
   const project = await getProjectOrThrow(id, env);
   return jsonResponse(await readManifest(project, env));
-}
-
-async function createPage(id, request, env) {
-  const project = await getProjectOrThrow(id, env);
-  const input = await request.json();
-  const pages = await readManifest(project, env);
-
-  const page = {
-    id: nextPageId(pages),
-    page_type: input.page_type,
-    media_type: input.media_type,
-    r2_key: input.r2_key || null,
-    external_url: input.external_url || null,
-    shareable: input.shareable !== false,
-    created_at: new Date().toISOString(),
-  };
-
-  pages.unshift(page); // newest at the front — top of grid, first slide
-  await writeManifest(project, env, pages);
-  return jsonResponse(page, 201);
-}
-
-function nextPageId(pages) {
-  const max = pages.reduce((m, p) => {
-    const match = /^page-(\d+)$/.exec(p.id || '');
-    return match ? Math.max(m, parseInt(match[1], 10)) : m;
-  }, 0);
-  return `page-${String(max + 1).padStart(3, '0')}`;
-}
-
-async function updatePage(id, pageId, request, env) {
-  const project = await getProjectOrThrow(id, env);
-  const updates = await request.json();
-  const pages = await readManifest(project, env);
-  const idx = pages.findIndex(p => p.id === pageId);
-  if (idx === -1) return jsonResponse({ error: 'Page not found' }, 404);
-
-  pages[idx] = { ...pages[idx], ...updates, id: pageId };
-  await writeManifest(project, env, pages);
-  return jsonResponse(pages[idx]);
-}
-
-async function deletePage(id, pageId, env) {
-  const project = await getProjectOrThrow(id, env);
-  const pages = await readManifest(project, env);
-  const idx = pages.findIndex(p => p.id === pageId);
-  if (idx === -1) return jsonResponse({ error: 'Page not found' }, 404);
-
-  const [removed] = pages.splice(idx, 1);
-  await writeManifest(project, env, pages);
-
-  if (removed.r2_key) await env.NOTICE_BUCKET.delete(removed.r2_key);
-  return new Response(null, { status: 204 });
-}
-
-async function reorderPages(id, request, env) {
-  const project = await getProjectOrThrow(id, env);
-  const { order } = await request.json();
-  if (!Array.isArray(order)) return jsonResponse({ error: 'Missing order array' }, 400);
-
-  const pages = await readManifest(project, env);
-  const byId = Object.fromEntries(pages.map(p => [p.id, p]));
-  const reordered = order.map(pid => byId[pid]).filter(Boolean);
-  pages.forEach(p => { if (!order.includes(p.id)) reordered.push(p); });
-
-  await writeManifest(project, env, reordered);
-  return jsonResponse(reordered);
 }
 
 // ══════════════════ LANDING COVER (scoped to a project) ══════════════════
@@ -389,16 +318,15 @@ async function setLanding(id, request, env) {
   return jsonResponse(landing);
 }
 
-// ══════════════════ UPLOAD (scoped to a project) ══════════════════
+// ══════════════════ UPLOAD (generic — used while building, before save) ══════════════════
 
-async function uploadMedia(id, request, env) {
-  const project = await getProjectOrThrow(id, env);
+async function uploadMedia(env, request) {
   const form = await request.formData();
   const file = form.get('file');
   if (!file || typeof file === 'string') return jsonResponse({ error: 'Missing file field' }, 400);
 
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-  const key = `${project.folder}media/${Date.now()}-${safeName}`;
+  const key = `${env.MEDIA_PREFIX}${Date.now()}-${safeName}`;
 
   await env.NOTICE_BUCKET.put(key, file.stream(), {
     httpMetadata: { contentType: file.type || 'application/octet-stream' },
