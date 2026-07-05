@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>3C Notice Board</title>
+  <link rel="icon" type="image/png" href="../assets/favicon.png" />
+  <link rel="stylesheet" href="../css/style.css" />
+  <link rel="stylesheet" href="viewer.css" />
+</head>
+<body>
+
+  <div class="viewer-wrap">
+    <div class="logo-row">
+      <img src="../assets/3C%20Thread%20To%20Success%20logo.png" alt="3C Thread To Success" />
+    </div>
+    <h1 class="neon-title">3C Notice Board</h1>
+
+    <div class="stage" id="stage">
+      <!-- media-frame injected here by viewer.js -->
+    </div>
+
+    <div class="page-actions" id="pageActions"></div>
+  </div>
+
+  <div class="slide-bar">
+    <button class="icon-btn" id="prevBtn"></button>
+    <span class="slide-counter" id="slideCounter">0 / 0</span>
+    <button class="icon-btn" id="nextBtn"></button>
+  </div>
+
+  <script type="module" src="viewer.js"></script>
+</body>
+</html>
