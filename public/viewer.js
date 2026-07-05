@@ -48,7 +48,7 @@ function render() {
 
   const page = pages[current];
   const src  = mediaUrl(page);
-  const frameClass = `media-frame ${page.page_type}`;
+  const frameClass = 'media-frame';
 
   let mediaHtml = '';
   let playRowHtml = '';
@@ -115,5 +115,24 @@ nextBtn.addEventListener('click', () => {
   current = current < pages.length - 1 ? current + 1 : 0;
   render();
 });
+
+// Swipe left = next page, swipe right = go back — the primary way
+// this is meant to be used, buttons are the fallback for desktop.
+let touchStartX = 0;
+stage.addEventListener('touchstart', (e) => {
+  touchStartX = e.changedTouches[0].screenX;
+}, { passive: true });
+
+stage.addEventListener('touchend', (e) => {
+  const touchEndX = e.changedTouches[0].screenX;
+  const delta = touchEndX - touchStartX;
+  const SWIPE_THRESHOLD = 40;
+
+  if (delta <= -SWIPE_THRESHOLD) {
+    nextBtn.click(); // swiped left -> next
+  } else if (delta >= SWIPE_THRESHOLD) {
+    prevBtn.click(); // swiped right -> back
+  }
+}, { passive: true });
 
 loadPages();
