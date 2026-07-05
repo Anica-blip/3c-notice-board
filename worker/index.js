@@ -164,13 +164,13 @@ async function getSessionUser(request, env) {
 // ══════════════════ PROJECTS ══════════════════
 
 async function readProjectsIndex(env) {
-  const file = await env.NOTICE_BUCKET.get(env.PROJECTS_KEY);
+  const file = await env.NOTICE_BUCKET.get('notice-board/projects.json');
   if (!file) return [];
   try { return await file.json(); } catch { return []; }
 }
 
 async function writeProjectsIndex(env, projects) {
-  await env.NOTICE_BUCKET.put(env.PROJECTS_KEY, JSON.stringify(projects), {
+  await env.NOTICE_BUCKET.put('notice-board/projects.json', JSON.stringify(projects), {
     httpMetadata: { contentType: 'application/json' },
   });
 }
@@ -192,34 +192,51 @@ async function listProjects(env) {
   return jsonResponse(await readProjectsIndex(env));
 }
 
+// Every project is exactly one JSON file: notice-board/{id}-{slug}.json
+// containing { title, pages, landing } together. The top-level index
+// (projects.json) only stores lightweight summaries for the Archive
+// list — it is not a second copy of project data, just a directory.
+function projectFileKey(id, slug) {
+  return `notice-board/${id}-${slug}.json`;
+}
+
 async function createProject(request, env) {
   const { title, pages } = await request.json();
   const projects = await readProjectsIndex(env);
 
-  const id     = nextProjectId(projects);
-  const slug   = slugify(title);
-  const folder = `notice-board/${id}-${slug}/`;
+  const id   = nextProjectId(projects);
+  const slug = slugify(title);
+  const key  = projectFileKey(id, slug);
   const finalPages = assignPageIds(pages || []);
 
-  const project = {
+  const projectData = {
     id,
     title: title || 'Untitled',
     slug,
-    folder,
-    cloudflare_url: `${env.PUBLIC_SITE_BASE}/public/?project=${id}`,
-    page_count: finalPages.length,
+    pages: finalPages,
+    landing: null,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
 
-  projects.unshift(project);
-  await writeProjectsIndex(env, projects);
-
-  await env.NOTICE_BUCKET.put(`${folder}manifest.json`, JSON.stringify(finalPages), {
+  await env.NOTICE_BUCKET.put(key, JSON.stringify(projectData), {
     httpMetadata: { contentType: 'application/json' },
   });
 
-  return jsonResponse({ ...project, pages: finalPages }, 201);
+  const summary = {
+    id,
+    title: projectData.title,
+    slug,
+    key,
+    cloudflare_url: `https://anica-blip.github.io/3c-notice-board/public/?project=${id}`,
+    page_count: finalPages.length,
+    created_at: projectData.created_at,
+    updated_at: projectData.updated_at,
+  };
+  projects.unshift(summary);
+  await writeProjectsIndex(env, projects);
+
+  return jsonResponse({ ...summary, pages: finalPages, landing: null }, 201);
 }
 
 // Assigns page-XXX ids only to entries that don't already have one —
@@ -245,18 +262,27 @@ async function saveProject(id, request, env) {
   const idx = projects.findIndex(p => p.id === id);
   if (idx === -1) return jsonResponse({ error: 'Project not found' }, 404);
 
+  const summary = projects[idx];
+  const existing = await readProjectFile(summary.key, env);
   const finalPages = assignPageIds(pages || []);
 
-  projects[idx].title      = title || projects[idx].title;
-  projects[idx].page_count = finalPages.length;
-  projects[idx].updated_at = new Date().toISOString();
-  await writeProjectsIndex(env, projects);
+  const projectData = {
+    ...existing,
+    title: title || summary.title,
+    pages: finalPages,
+    updated_at: new Date().toISOString(),
+  };
 
-  await env.NOTICE_BUCKET.put(`${projects[idx].folder}manifest.json`, JSON.stringify(finalPages), {
+  await env.NOTICE_BUCKET.put(summary.key, JSON.stringify(projectData), {
     httpMetadata: { contentType: 'application/json' },
   });
 
-  return jsonResponse({ ...projects[idx], pages: finalPages });
+  summary.title      = projectData.title;
+  summary.page_count = finalPages.length;
+  summary.updated_at = projectData.updated_at;
+  await writeProjectsIndex(env, projects);
+
+  return jsonResponse({ ...summary, pages: finalPages, landing: projectData.landing || null });
 }
 
 async function deleteProject(id, env) {
@@ -266,56 +292,56 @@ async function deleteProject(id, env) {
 
   const [removed] = projects.splice(idx, 1);
   await writeProjectsIndex(env, projects);
-
-  // Delete every object under this project's folder — manifest,
-  // landing, and all uploaded media.
-  const listing = await env.NOTICE_BUCKET.list({ prefix: removed.folder });
-  await Promise.all(listing.objects.map(obj => env.NOTICE_BUCKET.delete(obj.key)));
+  await env.NOTICE_BUCKET.delete(removed.key); // one file, one delete — no folder listing needed
 
   return new Response(null, { status: 204 });
 }
 
-async function getProjectOrThrow(id, env) {
+async function getSummaryOrThrow(id, env) {
   const projects = await readProjectsIndex(env);
-  const project = projects.find(p => p.id === id);
-  if (!project) throw new Error('Project not found');
-  return project;
+  const summary = projects.find(p => p.id === id);
+  if (!summary) throw new Error('Project not found');
+  return summary;
 }
 
-// ══════════════════ PAGES (scoped to a project) ══════════════════
-
-async function readManifest(project, env) {
-  const file = await env.NOTICE_BUCKET.get(`${project.folder}manifest.json`);
-  if (!file) return [];
-  try { return await file.json(); } catch { return []; }
+async function readProjectFile(key, env) {
+  const file = await env.NOTICE_BUCKET.get(key);
+  if (!file) return { pages: [], landing: null };
+  try { return await file.json(); } catch { return { pages: [], landing: null }; }
 }
+
+// ══════════════════ PAGES (read from the project's single file) ══════════════════
 
 async function listPages(id, env) {
-  const project = await getProjectOrThrow(id, env);
-  return jsonResponse(await readManifest(project, env));
+  const summary = await getSummaryOrThrow(id, env);
+  const data = await readProjectFile(summary.key, env);
+  return jsonResponse(data.pages || []);
 }
 
-// ══════════════════ LANDING COVER (scoped to a project) ══════════════════
+// ══════════════════ LANDING COVER (a field inside the project's single file) ══════════════════
 
 async function getLanding(id, env) {
-  const project = await getProjectOrThrow(id, env);
-  const file = await env.NOTICE_BUCKET.get(`${project.folder}landing.json`);
-  if (!file) return jsonResponse(null);
-  try { return jsonResponse(await file.json()); } catch { return jsonResponse(null); }
+  const summary = await getSummaryOrThrow(id, env);
+  const data = await readProjectFile(summary.key, env);
+  return jsonResponse(data.landing || null);
 }
 
 async function setLanding(id, request, env) {
-  const project = await getProjectOrThrow(id, env);
+  const summary = await getSummaryOrThrow(id, env);
+  const data = await readProjectFile(summary.key, env);
   const input = await request.json();
-  const landing = {
+
+  data.landing = {
     r2_key: input.r2_key || null,
     external_url: input.external_url || null,
     updated_at: new Date().toISOString(),
   };
-  await env.NOTICE_BUCKET.put(`${project.folder}landing.json`, JSON.stringify(landing), {
+  data.updated_at = new Date().toISOString();
+
+  await env.NOTICE_BUCKET.put(summary.key, JSON.stringify(data), {
     httpMetadata: { contentType: 'application/json' },
   });
-  return jsonResponse(landing);
+  return jsonResponse(data.landing);
 }
 
 // ══════════════════ UPLOAD (generic — used while building, before save) ══════════════════
@@ -326,13 +352,13 @@ async function uploadMedia(env, request) {
   if (!file || typeof file === 'string') return jsonResponse({ error: 'Missing file field' }, 400);
 
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-  const key = `${env.MEDIA_PREFIX}${Date.now()}-${safeName}`;
+  const key = `notice-board/media/${Date.now()}-${safeName}`;
 
   await env.NOTICE_BUCKET.put(key, file.stream(), {
     httpMetadata: { contentType: file.type || 'application/octet-stream' },
   });
 
-  return jsonResponse({ r2_key: key, url: `${env.PUBLIC_MEDIA_BASE}${key}` }, 201);
+  return jsonResponse({ r2_key: key, url: `https://files.3c-public-library.org/${key}` }, 201);
 }
 
 // ══════════════════ Session signing (HMAC-SHA256) ══════════════════
