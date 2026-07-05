@@ -37,6 +37,9 @@ export default {
       if (path === '/api/pages' && request.method === 'POST')
         return corsResponse(env, await guarded(request, env, () => createPage(request, env)));
 
+      if (path === '/api/pages/reorder' && request.method === 'POST')
+        return corsResponse(env, await guarded(request, env, () => reorderPages(request, env)));
+
       const pageMatch = path.match(/^\/api\/pages\/(.+)$/);
       if (pageMatch) {
         const id = decodeURIComponent(pageMatch[1]);
@@ -44,6 +47,12 @@ export default {
         if (request.method === 'PUT')    return corsResponse(env, await guarded(request, env, () => updatePage(id, request, env)));
         if (request.method === 'DELETE') return corsResponse(env, await guarded(request, env, () => deletePage(id, env)));
       }
+
+      if (path === '/api/landing' && request.method === 'GET')
+        return corsResponse(env, await getLanding(env));
+
+      if (path === '/api/landing' && request.method === 'PUT')
+        return corsResponse(env, await guarded(request, env, () => setLanding(request, env)));
 
       if (path === '/api/upload' && request.method === 'POST')
         return corsResponse(env, await guarded(request, env, () => uploadMedia(request, env)));
@@ -156,9 +165,11 @@ async function writeManifest(env, pages) {
 }
 
 // ── Pages: list (public — no auth, the viewer needs this) ────
+// Array order IS display order — index 0 is shown first, both in the
+// admin grid and the public slider. No timestamp sorting; reordering
+// happens by rewriting this array via /api/pages/reorder.
 async function listPages(env) {
   const pages = await readManifest(env);
-  pages.sort((a, b) => (b.order_index ?? 0) - (a.order_index ?? 0));
   return jsonResponse(pages);
 }
 
@@ -171,25 +182,58 @@ async function getPage(id, env) {
 }
 
 // ── Pages: create (guarded) ──────────────────────────────────
+// New pages go to the FRONT of the array — top of the admin grid,
+// first slide in the public viewer. This is the only automatic
+// ordering; after that, order changes only via reorderPages.
 async function createPage(request, env) {
   const input = await request.json();
   const pages = await readManifest(env);
 
   const page = {
-    id: crypto.randomUUID(),
-    order_index: input.order_index ?? Date.now(),
+    id: nextPageId(pages),
     page_type: input.page_type,       // 'portrait' | 'landscape' | 'square'
     media_type: input.media_type,     // 'image' | 'video' | 'audio'
     r2_key: input.r2_key || null,     // set if uploaded via /api/upload
     external_url: input.external_url || null, // set if linking an existing URL instead
     shareable: input.shareable !== false,
-    is_landing: !!input.is_landing,
     created_at: new Date().toISOString(),
   };
 
-  pages.push(page);
+  pages.unshift(page);
   await writeManifest(env, pages);
   return jsonResponse(page, 201);
+}
+
+// ── Pages: reorder (guarded) ──────────────────────────────────
+// Body: { order: ["page-003", "page-001", "page-002", ...] } — the
+// full list of IDs in the new desired order. Rewrites the manifest
+// array to match exactly. Used for both single-step swaps (the ↑/↓
+// buttons in admin) and any future drag-and-drop.
+async function reorderPages(request, env) {
+  const { order } = await request.json();
+  if (!Array.isArray(order)) return jsonResponse({ error: 'Missing order array' }, 400);
+
+  const pages = await readManifest(env);
+  const byId = Object.fromEntries(pages.map(p => [p.id, p]));
+
+  const reordered = order.map(id => byId[id]).filter(Boolean);
+  // Safety net — if any known page was somehow left out of the
+  // provided order, keep it rather than silently losing it.
+  pages.forEach(p => { if (!order.includes(p.id)) reordered.push(p); });
+
+  await writeManifest(env, reordered);
+  return jsonResponse(reordered);
+}
+
+// Generic sequential numbering — page-001, page-002, etc. Based on the
+// highest existing number in the manifest, not the array length, so
+// deleting a page never causes a duplicate ID.
+function nextPageId(pages) {
+  const max = pages.reduce((m, p) => {
+    const match = /^page-(\d+)$/.exec(p.id || '');
+    return match ? Math.max(m, parseInt(match[1], 10)) : m;
+  }, 0);
+  return `page-${String(max + 1).padStart(3, '0')}`;
 }
 
 // ── Pages: update (guarded, upsert fields) ───────────────────
@@ -220,6 +264,28 @@ async function deletePage(id, env) {
   }
 
   return new Response(null, { status: 204 });
+}
+
+// ── Landing cover: separate from the slider entirely ─────────
+// One image, one JSON file (env.LANDING_KEY), never counted among
+// the numbered slider pages.
+async function getLanding(env) {
+  const file = await env.NOTICE_BUCKET.get(env.LANDING_KEY);
+  if (!file) return jsonResponse(null);
+  try { return jsonResponse(await file.json()); } catch { return jsonResponse(null); }
+}
+
+async function setLanding(request, env) {
+  const input = await request.json();
+  const landing = {
+    r2_key: input.r2_key || null,
+    external_url: input.external_url || null,
+    updated_at: new Date().toISOString(),
+  };
+  await env.NOTICE_BUCKET.put(env.LANDING_KEY, JSON.stringify(landing), {
+    httpMetadata: { contentType: 'application/json' },
+  });
+  return jsonResponse(landing);
 }
 
 // ── Media upload (guarded) ────────────────────────────────────
