@@ -1,6 +1,7 @@
 // public/viewer.js — 3C Notice Board public viewer
-// No login. Pages arrive newest-first from the Worker (order_index desc),
-// so pages[0] is the landing page by definition — "last comes first."
+// No login. Requires ?project=<id> in the URL — each project is its
+// own saved slider. Pages arrive newest-first (array order from the
+// Worker), so pages[0] is shown first — "last added comes first."
 
 import { WORKER_BASE } from '../js/auth.js';
 import { icon } from '../js/icons.js';
@@ -14,13 +15,24 @@ const slideCounter  = document.getElementById('slideCounter');
 prevBtn.innerHTML = icon('back');
 nextBtn.innerHTML = icon('next');
 
+const projectId = new URLSearchParams(window.location.search).get('project');
+
 let pages = [];
 let current = 0;
 
 async function loadPages() {
-  const res = await fetch(`${WORKER_BASE}/api/pages`);
-  pages = await res.json();
-  render();
+  if (!projectId) {
+    stage.innerHTML = '<p>No project specified — this link is missing <code>?project=</code>.</p>';
+    slideCounter.textContent = '0 / 0';
+    return;
+  }
+  try {
+    const res = await fetch(`${WORKER_BASE}/api/projects/${encodeURIComponent(projectId)}/pages`);
+    pages = await res.json();
+    render();
+  } catch (err) {
+    stage.innerHTML = `<p>Could not load this project: ${err.message}</p>`;
+  }
 }
 
 function mediaUrl(page) {
@@ -85,7 +97,7 @@ function renderActions(page, src) {
   shareBtn.className = 'btn';
   shareBtn.innerHTML = `${icon('share')} Share`;
   shareBtn.addEventListener('click', async () => {
-    const pageUrl = `${window.location.origin}${window.location.pathname}#page=${page.id}`;
+    const pageUrl = `${window.location.origin}${window.location.pathname}?project=${projectId}#page=${page.id}`;
     await navigator.clipboard.writeText(pageUrl);
     shareBtn.innerHTML = `${icon('share')} Copied!`;
     setTimeout(() => { shareBtn.innerHTML = `${icon('share')} Share`; }, 1500);
