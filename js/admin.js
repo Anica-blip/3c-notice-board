@@ -86,9 +86,25 @@ saveProjectBtn.addEventListener('click', async () => {
     return;
   }
 
-  projectStatus.textContent = 'Saving…';
+  projectStatus.textContent = 'Saving to R2 bucket…';
 
   try {
+    const pageIdsWithPending = Object.keys(pendingFiles);
+    for (let i = 0; i < pageIdsWithPending.length; i++) {
+      const pageId = pageIdsWithPending[i];
+      const file   = pendingFiles[pageId];
+      const page   = pages.find(p => p.id === pageId);
+      if (!page || !file) continue;
+
+      projectStatus.textContent = `Saving to R2 bucket… (${i + 1} of ${pageIdsWithPending.length} files)`;
+      const formData = new FormData();
+      formData.append('file', file);
+      const uploadRes  = await authFetch('/api/upload', { method: 'POST', body: formData });
+      const uploadData = await uploadRes.json();
+      if (!uploadRes.ok) throw new Error(uploadData.error || `Upload failed for ${pageId}`);
+      page.r2_key       = uploadData.r2_key;
+      page.external_url = null;
+    }
     pendingFiles = {};
 
     projectStatus.textContent = 'Saving…';
