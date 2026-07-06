@@ -14,9 +14,7 @@
 }
 
 /* ── LANDING SECTION ───────────────────────────── */
-.landing-section {
-  margin: 20px 0;
-}
+.landing-section { margin: 20px 0; }
 
 .landing-media {
   width: 100%;
@@ -29,9 +27,6 @@
 }
 
 .landing-media img {
-  /* A4 page: scale to fit the container width, preserve aspect ratio,
-     never stretch or crop. max-height keeps it visible on desktop
-     without overflowing the viewport. */
   width: 100%;
   height: auto;
   max-height: 72vh;
@@ -39,62 +34,112 @@
   display: block;
 }
 
+/* Smaller, more discreet ENTER button */
 .btn-enter {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #7c3aed, #c77dff);
-  color: #fff;
-  border: none;
+  background: rgba(124,58,237,0.25);
+  color: #c77dff;
+  border: 1.5px solid rgba(199,125,255,0.45);
   border-radius: 50px;
-  padding: 14px 48px;
+  padding: 8px 28px;
   font-family: 'Outfit', sans-serif;
-  font-size: 15px;
+  font-size: 11px;
   font-weight: 800;
-  letter-spacing: 2px;
+  letter-spacing: 2.5px;
   text-transform: uppercase;
   cursor: pointer;
-  transition: opacity 0.15s, transform 0.15s;
-  box-shadow: 0 0 24px rgba(199,125,255,0.35);
-  margin-top: 8px;
+  transition: background 0.15s, transform 0.15s;
+  margin-top: 10px;
 }
 .btn-enter:hover {
-  opacity: 0.88;
+  background: rgba(124,58,237,0.45);
   transform: scale(1.03);
 }
 
-/* ── SLIDER STAGE ──────────────────────────────── */
-.stage {
-  background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(199,125,255,0.2);
-  border-radius: 16px;
-  padding: 14px;
+/* ── TV FRAME — wraps the stage on desktop ─────── */
+.tv-frame {
+  display: inline-block;
+  width: 100%;
+  background: #0a0515;
+  border: 2px solid rgba(199,125,255,0.3);
+  border-radius: 18px;
+  box-shadow: 0 0 48px rgba(124,58,237,0.25), inset 0 0 0 6px #0d0720;
+  overflow: hidden;
   margin: 16px 0;
+  text-align: left;
+}
+
+/* Stage sits inside tv-frame */
+.stage {
+  background: #0d0720;
+  padding: 10px 10px 0;
 }
 
 .media-frame {
   width: 100%;
-  max-width: 480px;
   margin: 0 auto;
-  border-radius: 12px;
-  overflow: hidden;
   background: #0a0515;
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
 }
 
 .media-frame img,
 .media-frame video {
-  /* A4 pages: scale proportionally to fit the frame width,
-     never stretch or crop, never overflow the viewport height.
-     object-fit:contain ensures the full page is always visible. */
+  /* A4 portrait: scale to fill frame width, contain fully — no crop */
   width: 100%;
   height: auto;
   max-height: 72vh;
   object-fit: contain;
   display: block;
 }
+
+/* ── TV FRAME BAR — bottom strip inside the frame ── */
+.tv-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  background: rgba(18,10,42,0.92);
+  border-top: 1px solid rgba(199,125,255,0.15);
+}
+
+.tv-bar__title {
+  flex: 1;
+  text-align: center;
+  font-size: 10px;
+  font-weight: 700;
+  color: rgba(199,125,255,0.7);
+  letter-spacing: 0.8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0 8px;
+}
+
+.tv-bar__actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.tv-bar__btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  color: rgba(199,125,255,0.55);
+  display: flex;
+  align-items: center;
+  transition: color 0.15s;
+  text-decoration: none;
+}
+.tv-bar__btn:hover { color: rgba(199,125,255,1); }
+.tv-bar__btn svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; }
 
 /* ── PLAY ROW ──────────────────────────────────── */
 .play-row {
@@ -103,20 +148,10 @@
   justify-content: center;
 }
 
-/* ── PAGE ACTIONS ──────────────────────────────── */
-.page-actions {
-  display: flex;
-  justify-content: center;
-  gap: 12px;
-  margin-top: 12px;
-}
-
 /* ── SLIDE BAR (fixed bottom) ──────────────────── */
 .slide-bar {
   position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
+  bottom: 0; left: 0; right: 0;
   background: rgba(18,10,42,0.88);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
@@ -135,8 +170,21 @@
   text-align: center;
 }
 
-/* ── DESKTOP: slightly wider, still contained ─── */
+/* ── DESKTOP: expand TV frame to ~54% viewport width ── */
 @media (min-width: 640px) {
-  .viewer-wrap { max-width: 640px; }
-  .landing-media, .media-frame { max-width: 560px; }
+  .viewer-wrap {
+    max-width: 96vw;
+    padding: 20px 20px 120px;
+  }
+  .tv-frame {
+    width: 54vw;
+    max-width: 860px;
+  }
+  .landing-media {
+    max-width: 54vw;
+  }
+  .media-frame img,
+  .media-frame video {
+    max-height: 78vh;
+  }
 }
