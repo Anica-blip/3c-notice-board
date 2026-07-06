@@ -16,14 +16,22 @@
     </div>
     <h1 class="neon-title">3C Notice Board</h1>
 
+  <!-- Landing page — shown first, hidden after ENTER is clicked -->
+  <div class="landing-section" id="landingSection" style="display:none;">
+    <div class="landing-media" id="landingMedia"></div>
+    <button class="btn btn-enter" id="enterBtn">ENTER</button>
+  </div>
+
+  <!-- Slider section — hidden until ENTER is clicked -->
+  <div id="sliderSection" style="display:none;">
     <div class="stage" id="stage">
       <!-- media-frame injected here by viewer.js -->
     </div>
-
     <div class="page-actions" id="pageActions"></div>
   </div>
+  </div>
 
-  <div class="slide-bar">
+  <div class="slide-bar" id="slideBar" style="display:none;">
     <button class="icon-btn" id="prevBtn"></button>
     <span class="slide-counter" id="slideCounter">0 / 0</span>
     <button class="icon-btn" id="nextBtn"></button>
