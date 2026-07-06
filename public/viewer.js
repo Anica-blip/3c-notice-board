@@ -3,6 +3,7 @@
 
 import { WORKER_BASE } from '../js/auth.js';
 import { icon } from '../js/icon.js';
+import { sharePage } from '../js/share.js';
 
 const stage          = document.getElementById('stage');
 const prevBtn        = document.getElementById('prevBtn');
@@ -30,7 +31,7 @@ let projectTitle = '';
 async function init() {
   if (!projectId) {
     landingSection.style.display = 'block';
-    landingMedia.innerHTML = '<p style="color:rgba(255,255,255,0.5);padding:40px 0;">No project specified — URL is missing <code>?project=</code>.</p>';
+    landingMedia.innerHTML = '<p style="color:rgba(255,255,255,0.5);padding:40px 0;">No project specified.</p>';
     enterBtn.style.display = 'none';
     return;
   }
@@ -82,36 +83,6 @@ async function loadProject() {
   }
 }
 
-// ── SHARE ─────────────────────────────────────────
-// Mobile: Web Share API — native sheet, can send image to social apps.
-// Desktop: copies title + page number + URL as formatted text.
-
-async function doShare(src) {
-  const shareUrl  = `${window.location.origin}${window.location.pathname}?project=${encodeURIComponent(projectId)}`;
-  const shareText = `${projectTitle} · Page ${current + 1} of ${pages.length}`;
-
-  if (navigator.share) {
-    try {
-      const res  = await fetch(src);
-      const blob = await res.blob();
-      const file = new File([blob], `3c-notice-page-${current + 1}.jpg`, { type: blob.type });
-      if (navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ title: projectTitle, text: shareText, url: shareUrl, files: [file] });
-        return 'shared';
-      }
-    } catch { /* fall through */ }
-    try {
-      await navigator.share({ title: projectTitle, text: shareText, url: shareUrl });
-      return 'shared';
-    } catch { /* user cancelled — fall through */ }
-  }
-
-  // Desktop fallback: copy formatted text
-  const clipText = `${projectTitle}\nPage ${current + 1} of ${pages.length}\n${shareUrl}`;
-  await navigator.clipboard.writeText(clipText);
-  return 'copied';
-}
-
 // ── RENDER ────────────────────────────────────────
 
 function mediaUrl(page) {
@@ -144,10 +115,9 @@ function render() {
   stage.innerHTML = `<div class="media-frame">${mediaHtml}</div>${playRowHtml}`;
   slideCounter.textContent = `${current + 1} / ${pages.length}`;
 
-  // TV bar title
   if (tvBarTitle) tvBarTitle.textContent = projectTitle;
 
-  // Wire share button — clone to drop any previous listener
+  // Wire share button — clone to drop previous listener
   const tvShareBtn = document.querySelector('[data-tv="share"]');
   if (tvShareBtn) {
     const newShare = tvShareBtn.cloneNode(true);
@@ -157,7 +127,14 @@ function render() {
       newShare.addEventListener('click', async () => {
         newShare.style.opacity = '0.5';
         try {
-          const result = await doShare(src);
+          const result = await sharePage({
+            projectId,
+            pageId:       page.id,
+            pageIndex:    current + 1,
+            pageCount:    pages.length,
+            projectTitle,
+            imageSrc:     src,
+          });
           if (result === 'copied') {
             newShare.style.color = '#86efac';
             setTimeout(() => { newShare.style.color = ''; }, 1800);
@@ -170,8 +147,7 @@ function render() {
     }
   }
 
-  // Wire eye/open button — opens image full view in new tab
-  // Browser's native toolbar gives the user a download button from there.
+  // Wire eye/open button
   const tvOpenBtn = document.querySelector('[data-tv="open"]');
   if (tvOpenBtn) {
     const newOpen = tvOpenBtn.cloneNode(true);
