@@ -1,7 +1,9 @@
+/* public/viewer.css — 3C Notice Board public viewer styles */
+
 .viewer-wrap {
-  max-width: 480px;
+  max-width: 560px;
   margin: 0 auto;
-  padding: 20px 14px 100px;
+  padding: 20px 14px 120px;
   text-align: center;
 }
 
@@ -11,6 +13,57 @@
   margin-bottom: 6px;
 }
 
+/* ── LANDING SECTION ───────────────────────────── */
+.landing-section {
+  margin: 20px 0;
+}
+
+.landing-media {
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto 20px;
+  border-radius: 16px;
+  overflow: hidden;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(199,125,255,0.2);
+}
+
+.landing-media img {
+  /* A4 page: scale to fit the container width, preserve aspect ratio,
+     never stretch or crop. max-height keeps it visible on desktop
+     without overflowing the viewport. */
+  width: 100%;
+  height: auto;
+  max-height: 72vh;
+  object-fit: contain;
+  display: block;
+}
+
+.btn-enter {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #7c3aed, #c77dff);
+  color: #fff;
+  border: none;
+  border-radius: 50px;
+  padding: 14px 48px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.15s;
+  box-shadow: 0 0 24px rgba(199,125,255,0.35);
+  margin-top: 8px;
+}
+.btn-enter:hover {
+  opacity: 0.88;
+  transform: scale(1.03);
+}
+
+/* ── SLIDER STAGE ──────────────────────────────── */
 .stage {
   background: rgba(255,255,255,0.05);
   border: 1px solid rgba(199,125,255,0.2);
@@ -21,8 +74,7 @@
 
 .media-frame {
   width: 100%;
-  max-width: 460px;
-  max-height: 70vh;
+  max-width: 480px;
   margin: 0 auto;
   border-radius: 12px;
   overflow: hidden;
@@ -34,20 +86,24 @@
 
 .media-frame img,
 .media-frame video {
-  max-width: 100%;
-  max-height: 70vh;
-  width: auto;
+  /* A4 pages: scale proportionally to fit the frame width,
+     never stretch or crop, never overflow the viewport height.
+     object-fit:contain ensures the full page is always visible. */
+  width: 100%;
   height: auto;
+  max-height: 72vh;
   object-fit: contain;
   display: block;
 }
 
+/* ── PLAY ROW ──────────────────────────────────── */
 .play-row {
   margin-top: 10px;
   display: flex;
   justify-content: center;
 }
 
+/* ── PAGE ACTIONS ──────────────────────────────── */
 .page-actions {
   display: flex;
   justify-content: center;
@@ -55,12 +111,13 @@
   margin-top: 12px;
 }
 
+/* ── SLIDE BAR (fixed bottom) ──────────────────── */
 .slide-bar {
   position: fixed;
   bottom: 0;
   left: 0;
   right: 0;
-  background: rgba(18,10,42,0.85);
+  background: rgba(18,10,42,0.88);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   border-top: 1px solid rgba(199,125,255,0.2);
@@ -76,4 +133,10 @@
   color: rgba(255,255,255,0.6);
   min-width: 48px;
   text-align: center;
+}
+
+/* ── DESKTOP: slightly wider, still contained ─── */
+@media (min-width: 640px) {
+  .viewer-wrap { max-width: 640px; }
+  .landing-media, .media-frame { max-width: 560px; }
 }
