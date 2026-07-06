@@ -1,72 +1,116 @@
 // public/viewer.js — 3C Notice Board public viewer
-// No login. Requires ?project=<id> in the URL. Pages are stored in the
-// order they were created (page 1 first, matching the admin builder
-// exactly — same as Showcase's addCard/push). The viewer itself is
-// what starts on the LAST page and moves backward as you go "next" —
-// that's a display choice here, not how the data is stored.
+// No login. Requires ?project=<id> in the URL.
+// Flow: fetch landing → show with ENTER button → on click load slider
+// Slider starts on the LAST page (newest first).
 
 import { WORKER_BASE } from '../js/auth.js';
-import { icon } from '../js/icons.js';
+import { icon } from '../js/icon.js';
 
 const stage         = document.getElementById('stage');
 const pageActions   = document.getElementById('pageActions');
 const prevBtn       = document.getElementById('prevBtn');
 const nextBtn       = document.getElementById('nextBtn');
 const slideCounter  = document.getElementById('slideCounter');
+const slideBar      = document.getElementById('slideBar');
+const sliderSection = document.getElementById('sliderSection');
+const landingSection= document.getElementById('landingSection');
+const landingMedia  = document.getElementById('landingMedia');
+const enterBtn      = document.getElementById('enterBtn');
 
 prevBtn.innerHTML = icon('back');
 nextBtn.innerHTML = icon('next');
 
+const R2_CDN    = 'https://files.3c-public-library.org/';
 const projectId = new URLSearchParams(window.location.search).get('project');
 
-let pages = [];
+let pages   = [];
 let current = 0;
 
-async function loadPages() {
+// ── INIT — landing first, slider after ENTER ──────────────
+
+async function init() {
   if (!projectId) {
-    stage.innerHTML = '<p>No project specified — this link is missing <code>?project=</code>.</p>';
-    slideCounter.textContent = '0 / 0';
+    landingSection.style.display = 'block';
+    landingMedia.innerHTML = '<p style="color:rgba(255,255,255,0.5);padding:40px 0;">No project specified — URL is missing <code>?project=</code>.</p>';
+    enterBtn.style.display = 'none';
     return;
   }
+
   try {
-    const res = await fetch(`${WORKER_BASE}/api/projects/${encodeURIComponent(projectId)}/pages`);
-    pages = await res.json();
-    current = pages.length ? pages.length - 1 : 0; // start on the LAST page
-    render();
-  } catch (err) {
-    stage.innerHTML = `<p>Could not load this project: ${err.message}</p>`;
+    const res     = await fetch(`${WORKER_BASE}/api/projects/${encodeURIComponent(projectId)}/landing`);
+    const landing = await res.json();
+    const src     = landing?.external_url || (landing?.r2_key ? `${R2_CDN}${landing.r2_key}` : '');
+
+    if (src) {
+      landingMedia.innerHTML = `<img src="${src}" alt="3C Notice Board" />`;
+      landingSection.style.display = 'block';
+
+      enterBtn.addEventListener('click', async () => {
+        landingSection.style.display = 'none';
+        await loadPages();
+        showSlider();
+      });
+    } else {
+      // No landing page saved — go straight to slider
+      await loadPages();
+      showSlider();
+    }
+  } catch {
+    // Landing fetch failed — go straight to slider
+    await loadPages();
+    showSlider();
   }
 }
 
+function showSlider() {
+  sliderSection.style.display = 'block';
+  slideBar.style.display      = 'flex';
+}
+
+// ── LOAD PAGES ────────────────────────────────────────────
+
+async function loadPages() {
+  try {
+    const res = await fetch(`${WORKER_BASE}/api/projects/${encodeURIComponent(projectId)}/pages`);
+    pages   = await res.json();
+    current = pages.length ? pages.length - 1 : 0; // start on LAST page (newest first)
+    render();
+  } catch (err) {
+    stage.innerHTML = `<p style="color:rgba(255,255,255,0.5);padding:40px 0;">Could not load this project: ${err.message}</p>`;
+    slideCounter.textContent = '0 / 0';
+  }
+}
+
+// ── RENDER CURRENT PAGE ───────────────────────────────────
+
 function mediaUrl(page) {
-  return page.external_url || page.r2_key || '';
+  return page.external_url || (page.r2_key ? `${R2_CDN}${page.r2_key}` : '');
 }
 
 function render() {
   if (!pages.length) {
-    stage.innerHTML = '<p>No pages yet.</p>';
+    stage.innerHTML = '<p style="color:rgba(255,255,255,0.5);padding:40px 0;">No pages yet.</p>';
     slideCounter.textContent = '0 / 0';
     return;
   }
 
   const page = pages[current];
   const src  = mediaUrl(page);
-  const frameClass = 'media-frame';
 
-  let mediaHtml = '';
+  let mediaHtml   = '';
   let playRowHtml = '';
 
   if (page.media_type === 'image') {
     mediaHtml = `<img src="${src}" alt="Notice board page" />`;
   } else if (page.media_type === 'video') {
-    mediaHtml = `<video id="mediaEl" src="${src}" playsinline></video>`;
+    mediaHtml   = `<video id="mediaEl" src="${src}" playsinline></video>`;
     playRowHtml = `<div class="play-row"><button class="btn" id="playBtn">${icon('play')} Play</button></div>`;
   } else if (page.media_type === 'audio') {
-    mediaHtml = `<div style="padding:40px 0;color:rgba(255,255,255,0.6);">Audio</div><audio id="mediaEl" src="${src}"></audio>`;
+    mediaHtml   = `<div style="padding:40px 0;color:rgba(255,255,255,0.6);">Audio</div><audio id="mediaEl" src="${src}"></audio>`;
     playRowHtml = `<div class="play-row"><button class="btn" id="playBtn">${icon('play')} Play</button></div>`;
   }
 
-  stage.innerHTML = `<div class="${frameClass}">${mediaHtml}</div>${playRowHtml}`;
+  stage.innerHTML = `<div class="media-frame">${mediaHtml}</div>${playRowHtml}`;
   slideCounter.textContent = `${current + 1} / ${pages.length}`;
 
   const playBtn = document.getElementById('playBtn');
@@ -88,12 +132,12 @@ function render() {
 
 function renderActions(page, src) {
   pageActions.innerHTML = '';
-  if (!page.shareable) return; // landing page (or any page marked non-shareable) skips these
+  if (!page.shareable) return;
 
   const downloadBtn = document.createElement('a');
   downloadBtn.className = 'btn';
-  downloadBtn.href = src;
-  downloadBtn.download = '';
+  downloadBtn.href      = src;
+  downloadBtn.download  = '';
   downloadBtn.innerHTML = `${icon('download')} Download`;
 
   const shareBtn = document.createElement('button');
@@ -110,6 +154,8 @@ function renderActions(page, src) {
   pageActions.appendChild(shareBtn);
 }
 
+// ── NAV BUTTONS ───────────────────────────────────────────
+
 prevBtn.addEventListener('click', () => {
   current = current < pages.length - 1 ? current + 1 : 0;
   render();
@@ -119,23 +165,15 @@ nextBtn.addEventListener('click', () => {
   render();
 });
 
-// Swipe left = next page, swipe right = go back — the primary way
-// this is meant to be used, buttons are the fallback for desktop.
+// Swipe support
 let touchStartX = 0;
 stage.addEventListener('touchstart', (e) => {
   touchStartX = e.changedTouches[0].screenX;
 }, { passive: true });
-
 stage.addEventListener('touchend', (e) => {
-  const touchEndX = e.changedTouches[0].screenX;
-  const delta = touchEndX - touchStartX;
-  const SWIPE_THRESHOLD = 40;
-
-  if (delta <= -SWIPE_THRESHOLD) {
-    nextBtn.click(); // swiped left -> next
-  } else if (delta >= SWIPE_THRESHOLD) {
-    prevBtn.click(); // swiped right -> back
-  }
+  const delta = e.changedTouches[0].screenX - touchStartX;
+  if (delta <= -40) nextBtn.click();
+  else if (delta >= 40) prevBtn.click();
 }, { passive: true });
 
-loadPages();
+init();
