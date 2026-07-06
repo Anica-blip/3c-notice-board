@@ -48,6 +48,7 @@ export default {
       const projectMatch = path.match(/^\/api\/projects\/([^/]+)$/);
       if (projectMatch) {
         const id = decodeURIComponent(projectMatch[1]);
+        if (request.method === 'GET')    return corsResponse(env, await getProjectMeta(id, env));
         if (request.method === 'PUT')    return corsResponse(env, await guarded(request, env, () => saveProject(id, request, env)));
         if (request.method === 'DELETE') return corsResponse(env, await guarded(request, env, () => deleteProject(id, env)));
       }
@@ -311,6 +312,11 @@ async function readProjectFile(key, env) {
 }
 
 // ══════════════════ PAGES (read from the project's single file) ══════════════════
+
+async function getProjectMeta(id, env) {
+  const summary = await getSummaryOrThrow(id, env);
+  return jsonResponse({ id: summary.id, title: summary.title, cloudflare_url: summary.cloudflare_url });
+}
 
 async function listPages(id, env) {
   const summary = await getSummaryOrThrow(id, env);
