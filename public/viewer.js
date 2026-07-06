@@ -1,21 +1,19 @@
 // public/viewer.js — 3C Notice Board public viewer
-// No login. Requires ?project=<id> in the URL.
 // Flow: fetch landing → show with ENTER button → on click load slider
 // Slider starts on the LAST page (newest first).
 
 import { WORKER_BASE } from '../js/auth.js';
 import { icon } from '../js/icon.js';
 
-const stage         = document.getElementById('stage');
-const pageActions   = document.getElementById('pageActions');
-const prevBtn       = document.getElementById('prevBtn');
-const nextBtn       = document.getElementById('nextBtn');
-const slideCounter  = document.getElementById('slideCounter');
-const slideBar      = document.getElementById('slideBar');
-const sliderSection = document.getElementById('sliderSection');
-const landingSection= document.getElementById('landingSection');
-const landingMedia  = document.getElementById('landingMedia');
-const enterBtn      = document.getElementById('enterBtn');
+const stage          = document.getElementById('stage');
+const prevBtn        = document.getElementById('prevBtn');
+const nextBtn        = document.getElementById('nextBtn');
+const slideCounter   = document.getElementById('slideCounter');
+const slideBar       = document.getElementById('slideBar');
+const sliderSection  = document.getElementById('sliderSection');
+const landingSection = document.getElementById('landingSection');
+const landingMedia   = document.getElementById('landingMedia');
+const enterBtn       = document.getElementById('enterBtn');
 
 prevBtn.innerHTML = icon('back');
 nextBtn.innerHTML = icon('next');
@@ -23,10 +21,11 @@ nextBtn.innerHTML = icon('next');
 const R2_CDN    = 'https://files.3c-public-library.org/';
 const projectId = new URLSearchParams(window.location.search).get('project');
 
-let pages   = [];
-let current = 0;
+let pages        = [];
+let current      = 0;
+let projectTitle = '';
 
-// ── INIT — landing first, slider after ENTER ──────────────
+// ── INIT ─────────────────────────────────────────
 
 async function init() {
   if (!projectId) {
@@ -44,20 +43,17 @@ async function init() {
     if (src) {
       landingMedia.innerHTML = `<img src="${src}" alt="3C Notice Board" />`;
       landingSection.style.display = 'block';
-
       enterBtn.addEventListener('click', async () => {
         landingSection.style.display = 'none';
-        await loadPages();
+        await loadProject();
         showSlider();
       });
     } else {
-      // No landing page saved — go straight to slider
-      await loadPages();
+      await loadProject();
       showSlider();
     }
   } catch {
-    // Landing fetch failed — go straight to slider
-    await loadPages();
+    await loadProject();
     showSlider();
   }
 }
@@ -67,13 +63,19 @@ function showSlider() {
   slideBar.style.display      = 'flex';
 }
 
-// ── LOAD PAGES ────────────────────────────────────────────
+// ── LOAD PROJECT (title + pages together) ─────────
 
-async function loadPages() {
+async function loadProject() {
   try {
-    const res = await fetch(`${WORKER_BASE}/api/projects/${encodeURIComponent(projectId)}/pages`);
-    pages   = await res.json();
-    current = pages.length ? pages.length - 1 : 0; // start on LAST page (newest first)
+    // Fetch title and pages in parallel
+    const [metaRes, pagesRes] = await Promise.all([
+      fetch(`${WORKER_BASE}/api/projects/${encodeURIComponent(projectId)}`),
+      fetch(`${WORKER_BASE}/api/projects/${encodeURIComponent(projectId)}/pages`),
+    ]);
+    const meta = await metaRes.json();
+    projectTitle = meta?.title || '';
+    pages   = await pagesRes.json();
+    current = pages.length ? pages.length - 1 : 0;
     render();
   } catch (err) {
     stage.innerHTML = `<p style="color:rgba(255,255,255,0.5);padding:40px 0;">Could not load this project: ${err.message}</p>`;
@@ -81,7 +83,7 @@ async function loadPages() {
   }
 }
 
-// ── RENDER CURRENT PAGE ───────────────────────────────────
+// ── RENDER ────────────────────────────────────────
 
 function mediaUrl(page) {
   return page.external_url || (page.r2_key ? `${R2_CDN}${page.r2_key}` : '');
@@ -113,48 +115,49 @@ function render() {
   stage.innerHTML = `<div class="media-frame">${mediaHtml}</div>${playRowHtml}`;
   slideCounter.textContent = `${current + 1} / ${pages.length}`;
 
+  // TV bar — title centred, share/download/close on the right
+  const tvBar = document.getElementById('tvBar');
+  if (tvBar) {
+    const shareUrl = `${window.location.origin}${window.location.pathname}?project=${projectId}#page=${page.id}`;
+    tvBar.querySelector('.tv-bar__title').textContent = projectTitle;
+    const shareBtn = tvBar.querySelector('[data-tv="share"]');
+    const dlBtn    = tvBar.querySelector('[data-tv="download"]');
+    const closeBtn = tvBar.querySelector('[data-tv="close"]');
+
+    // Rebuild listeners cleanly each render
+    shareBtn.replaceWith(shareBtn.cloneNode(true));
+    dlBtn.replaceWith(dlBtn.cloneNode(true));
+
+    const newShare = tvBar.querySelector('[data-tv="share"]');
+    const newDl    = tvBar.querySelector('[data-tv="download"]');
+
+    if (page.shareable) {
+      newShare.style.display = '';
+      newDl.style.display    = '';
+      newShare.addEventListener('click', async () => {
+        await navigator.clipboard.writeText(shareUrl);
+        newShare.style.color = '#86efac';
+        setTimeout(() => { newShare.style.color = ''; }, 1500);
+      });
+      newDl.href     = src;
+      newDl.download = '';
+    } else {
+      newShare.style.display = 'none';
+      newDl.style.display    = 'none';
+    }
+  }
+
   const playBtn = document.getElementById('playBtn');
   if (playBtn) {
     const mediaEl = document.getElementById('mediaEl');
     playBtn.addEventListener('click', () => {
-      if (mediaEl.paused) {
-        mediaEl.play();
-        playBtn.innerHTML = `${icon('play')} Pause`;
-      } else {
-        mediaEl.pause();
-        playBtn.innerHTML = `${icon('play')} Play`;
-      }
+      if (mediaEl.paused) { mediaEl.play(); playBtn.innerHTML = `${icon('play')} Pause`; }
+      else { mediaEl.pause(); playBtn.innerHTML = `${icon('play')} Play`; }
     });
   }
-
-  renderActions(page, src);
 }
 
-function renderActions(page, src) {
-  pageActions.innerHTML = '';
-  if (!page.shareable) return;
-
-  const downloadBtn = document.createElement('a');
-  downloadBtn.className = 'btn';
-  downloadBtn.href      = src;
-  downloadBtn.download  = '';
-  downloadBtn.innerHTML = `${icon('download')} Download`;
-
-  const shareBtn = document.createElement('button');
-  shareBtn.className = 'btn';
-  shareBtn.innerHTML = `${icon('share')} Share`;
-  shareBtn.addEventListener('click', async () => {
-    const pageUrl = `${window.location.origin}${window.location.pathname}?project=${projectId}#page=${page.id}`;
-    await navigator.clipboard.writeText(pageUrl);
-    shareBtn.innerHTML = `${icon('share')} Copied!`;
-    setTimeout(() => { shareBtn.innerHTML = `${icon('share')} Share`; }, 1500);
-  });
-
-  pageActions.appendChild(downloadBtn);
-  pageActions.appendChild(shareBtn);
-}
-
-// ── NAV BUTTONS ───────────────────────────────────────────
+// ── NAV ───────────────────────────────────────────
 
 prevBtn.addEventListener('click', () => {
   current = current < pages.length - 1 ? current + 1 : 0;
@@ -165,11 +168,8 @@ nextBtn.addEventListener('click', () => {
   render();
 });
 
-// Swipe support
 let touchStartX = 0;
-stage.addEventListener('touchstart', (e) => {
-  touchStartX = e.changedTouches[0].screenX;
-}, { passive: true });
+stage.addEventListener('touchstart', (e) => { touchStartX = e.changedTouches[0].screenX; }, { passive: true });
 stage.addEventListener('touchend', (e) => {
   const delta = e.changedTouches[0].screenX - touchStartX;
   if (delta <= -40) nextBtn.click();
