@@ -38,6 +38,15 @@ export default {
       if (path === '/auth/callback') return handleCallback(request, url, env);
       if (path === '/auth/me')       return corsResponse(env, await handleMe(request, env));
 
+      // ── OG share preview — serves rich meta tags for social platforms.
+      // When a bot/crawler hits /share?project=<id>&page=<pageId>, it
+      // receives an HTML page with og:title, og:description, og:image.
+      // Humans are instantly redirected to the viewer. This is what makes
+      // WhatsApp/Telegram/Twitter/email show a rich card with thumbnail.
+      if (path === '/share' && request.method === 'GET') {
+        return serveOgPage(url, env);
+      }
+
       // ── Projects — whole-document save: title + pages together ──
       if (path === '/api/projects' && request.method === 'GET')
         return corsResponse(env, await guarded(request, env, () => listProjects(env)));
@@ -312,6 +321,82 @@ async function readProjectFile(key, env) {
 }
 
 // ══════════════════ PAGES (read from the project's single file) ══════════════════
+
+const OG_DESCRIPTION =
+  'Welcome to the 3C Thread To Success where ideas become action. Discover ' +
+  'practical insights and resources designed to inspire growth, lifelong ' +
+  'learning, and meaningful progress.';
+
+const VIEWER_BASE = 'https://anica-blip.github.io/3c-notice-board/public/';
+const R2_CDN      = 'https://files.3c-public-library.org/';
+
+/**
+ * Serves an HTML page with OG meta tags for social preview cards.
+ * Bots/crawlers see the rich card; humans are instantly redirected
+ * to the real viewer with the correct project + page in the URL.
+ */
+async function serveOgPage(url, env) {
+  const projectId = url.searchParams.get('project');
+  const pageId    = url.searchParams.get('page');
+
+  const viewerUrl = `${VIEWER_BASE}?project=${encodeURIComponent(projectId || '')}${pageId ? `#page=${encodeURIComponent(pageId)}` : ''}`;
+
+  let title    = '3C Notice Board';
+  let imageUrl = '';
+
+  try {
+    const summary = await getSummaryOrThrow(projectId, env);
+    title = summary.title || title;
+
+    if (pageId) {
+      const obj  = await env.NOTICE_BUCKET.get(summary.key);
+      if (obj) {
+        const data  = await obj.json();
+        const found = (data.pages || []).find(p => String(p.id) === String(pageId));
+        if (found) {
+          imageUrl = found.external_url || (found.r2_key ? `${R2_CDN}${found.r2_key}` : '');
+        }
+      }
+    }
+  } catch { /* project not found — serve generic OG */ }
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>${escHtml(title)}</title>
+  <meta property="og:type"        content="website" />
+  <meta property="og:title"       content="${escHtml(title)}" />
+  <meta property="og:description" content="${escHtml(OG_DESCRIPTION)}" />
+  <meta property="og:url"         content="${escHtml(viewerUrl)}" />
+  ${imageUrl ? `<meta property="og:image" content="${escHtml(imageUrl)}" />
+  <meta property="og:image:width"  content="400" />
+  <meta property="og:image:height" content="566" />` : ''}
+  <meta name="twitter:card"        content="summary_large_image" />
+  <meta name="twitter:title"       content="${escHtml(title)}" />
+  <meta name="twitter:description" content="${escHtml(OG_DESCRIPTION)}" />
+  ${imageUrl ? `<meta name="twitter:image" content="${escHtml(imageUrl)}" />` : ''}
+  <meta http-equiv="refresh" content="0;url=${escHtml(viewerUrl)}" />
+</head>
+<body>
+  <script>window.location.replace(${JSON.stringify(viewerUrl)});</script>
+</body>
+</html>`;
+
+  return new Response(html, {
+    headers: {
+      'Content-Type': 'text/html;charset=UTF-8',
+      'Cache-Control': 'public, max-age=300',
+      'Access-Control-Allow-Origin': '*',
+    },
+  });
+}
+
+function escHtml(str) {
+  return String(str || '')
+    .replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
 
 async function getProjectMeta(id, env) {
   const summary = await getSummaryOrThrow(id, env);
