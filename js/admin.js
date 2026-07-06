@@ -86,28 +86,12 @@ saveProjectBtn.addEventListener('click', async () => {
     return;
   }
 
-  projectStatus.textContent = 'Saving to R2 bucket…';
+  projectStatus.textContent = 'Saving…';
 
   try {
-    const pageIdsWithPending = Object.keys(pendingFiles);
-    for (let i = 0; i < pageIdsWithPending.length; i++) {
-      const pageId = pageIdsWithPending[i];
-      const file = pendingFiles[pageId];
-      const page = pages.find(p => p.id === pageId);
-      if (!page || !file) continue;
-
-      projectStatus.textContent = `Saving to R2 bucket… (${i + 1} of ${pageIdsWithPending.length} files)`;
-      const formData = new FormData();
-      formData.append('file', file);
-      const uploadRes = await authFetch('/api/upload', { method: 'POST', body: formData });
-      const uploadData = await uploadRes.json();
-      if (!uploadRes.ok) throw new Error(uploadData.error || `Upload failed for ${pageId}`);
-      page.r2_key = uploadData.r2_key;
-      page.external_url = null;
-    }
     pendingFiles = {};
 
-    projectStatus.textContent = 'Saving to R2 bucket…';
+    projectStatus.textContent = 'Saving…';
 
     const outgoingPages = pages.map(({ id, media_type, r2_key, external_url, shareable }) => ({
       id: id.startsWith('local-') ? undefined : id,
@@ -124,7 +108,7 @@ saveProjectBtn.addEventListener('click', async () => {
       const project = await res.json();
 
       projectStatus.textContent = '';
-      alert(`Saved to R2 bucket\n\n${project.id} — ${project.cloudflare_url}`);
+      alert(`Saved\n\n${project.id} — ${project.cloudflare_url}`);
       await loadArchive();
       await loadNextIdPreview();
       resetWorkspace();
@@ -138,7 +122,7 @@ saveProjectBtn.addEventListener('click', async () => {
       const project = await res.json();
 
       projectStatus.textContent = '';
-      alert(`Saved to R2 bucket\n\n${project.id} — ${project.cloudflare_url}`);
+      alert(`Saved\n\n${project.id} — ${project.cloudflare_url}`);
       await loadArchive();
       resetWorkspace();
     }
@@ -266,8 +250,13 @@ function selectedPage() {
   return selectedIndex >= 0 ? pages[selectedIndex] : null;
 }
 
+const R2_CDN = 'https://files.3c-public-library.org/';
+
 function mediaSrc(page) {
-  return page.localPreview || page.external_url || page.r2_key || '';
+  if (page.localPreview) return page.localPreview;
+  if (page.external_url) return page.external_url;
+  if (page.r2_key) return `${R2_CDN}${page.r2_key}`;
+  return '';
 }
 
 function renderSelected() {
