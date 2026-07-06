@@ -193,14 +193,25 @@ function renderArchive(projects) {
       <td>${p.page_count ?? 0}</td>
       <td class="url-cell">${p.cloudflare_url}</td>
       <td class="actions-cell">
+        <button class="icon-btn btn-copy" data-action="copy" data-url="${p.cloudflare_url}" title="Copy URL">${icon('link')}</button>
         <button class="icon-btn" data-action="edit" data-id="${p.id}" title="Edit">${icon('edit')}</button>
-        <button class="icon-btn" data-action="open" data-id="${p.id}" data-url="${p.cloudflare_url}" title="View">${icon('link')}</button>
-        <button class="icon-btn" data-action="delete" data-id="${p.id}" title="Delete">${icon('delete')}</button>
+        <button class="icon-btn btn-view" data-action="open" data-id="${p.id}" data-url="${p.cloudflare_url}" title="View">${icon('link')}</button>
+        <button class="icon-btn btn-logout" data-action="delete" data-id="${p.id}" title="Delete">${icon('delete')}</button>
       </td>
     `;
     archiveBody.appendChild(tr);
   });
 
+  archiveBody.querySelectorAll('[data-action="copy"]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      navigator.clipboard.writeText(btn.dataset.url).then(() => {
+        const orig = btn.title;
+        btn.title = 'Copied!';
+        btn.style.color = '#86efac';
+        setTimeout(() => { btn.title = orig; btn.style.color = ''; }, 2000);
+      });
+    });
+  });
   archiveBody.querySelectorAll('[data-action="edit"]').forEach(btn => {
     btn.addEventListener('click', () => loadProjectIntoWorkspace(btn.dataset.id));
   });
@@ -311,7 +322,7 @@ function renderSelected() {
       </div>
     </div>
     <div class="card-detail-row" style="margin-top:10px;">
-      <label class="upload-btn-green" for="fileInput">⇧ ${uploadLabel}</label>
+      <label class="upload-btn-ghost" for="fileInput">⇧ ${uploadLabel}</label>
       <input type="file" id="fileInput" accept="${acceptType}" style="display:none;" />
       <div class="r2-url-row">
         <span class="r2-or">or paste R2 URL</span>
