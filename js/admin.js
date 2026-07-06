@@ -193,7 +193,7 @@ function renderArchive(projects) {
       <td>${p.page_count ?? 0}</td>
       <td class="url-cell">${p.cloudflare_url}</td>
       <td class="actions-cell">
-        <button class="icon-btn btn-copy" data-action="copy" data-url="${p.cloudflare_url}" title="Copy URL">${icon('link')}</button>
+        <button class="icon-btn btn-copy" data-action="copy" data-url="${p.cloudflare_url}" title="Copy URL">${icon('copy')}</button>
         <button class="icon-btn" data-action="edit" data-id="${p.id}" title="Edit">${icon('edit')}</button>
         <button class="icon-btn btn-view" data-action="open" data-id="${p.id}" data-url="${p.cloudflare_url}" title="View">${icon('link')}</button>
         <button class="icon-btn btn-logout" data-action="delete" data-id="${p.id}" title="Delete">${icon('delete')}</button>
