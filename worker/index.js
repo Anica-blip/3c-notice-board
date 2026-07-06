@@ -73,8 +73,8 @@ export default {
       // ── Upload — generic, not project-scoped. Needed before a
       // project even exists yet, since title+cards are built up in
       // the browser first and only saved together at the end. ──
-      // /api/upload removed — pages save as JSON only, no binary files.
-
+      if (path === '/api/upload' && request.method === 'POST')
+        return corsResponse(env, await guarded(request, env, () => uploadMedia(env, request)));
 
       return corsResponse(env, jsonResponse({ error: 'Not found' }, 404));
     } catch (err) {
