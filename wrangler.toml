@@ -24,7 +24,7 @@ bucket_name = "3c-library-files"
 # Shared "Anica-blip Tools" GitHub OAuth App — same Client ID used
 # across your other worker.js setups. Only the Secret and this
 # Worker's own callback URL need to be added on the GitHub side.
-GITHUB_CLIENT_ID = "Ov23liE08ErtOUs8SrV6"
+GITHUB_CLIENT_ID = "Ov23liaIwlblsBo7WAyL"
 ALLOWED_GITHUB_LOGIN = "Anica-blip"
 
 # GitHub Pages origin this Worker accepts requests from
