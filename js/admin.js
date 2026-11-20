@@ -11,7 +11,7 @@
 import { requireLogin, authFetch, logout, WORKER_BASE } from './auth.js';
 import { icon } from './icon.js';
 
-requireLogin();
+await requireLogin();
 document.getElementById('logoutBtn').addEventListener('click', logout);
 
 function friendlyError(err) {
